@@ -350,10 +350,11 @@ const Home: React.FC = () => {
         xhr.onerror = () => reject(new Error("Network error"));
         xhr.send(file);
       });
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error(e);
+      const message = e instanceof Error ? e.message : String(e);
       setUploadQueue(prev => prev.map(item => 
-        item.file === file ? { ...item, status: "error", error: e.message } : item
+        item.file === file ? { ...item, status: "error", error: message } : item
       ));
     }
   };
