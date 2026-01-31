@@ -173,6 +173,24 @@ const DownloadIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
+const PauseIcon = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
+  </svg>
+);
+
+const PlayIcon = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
+  </svg>
+);
+
+const TrashIcon = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+  </svg>
+);
+
 const CloseIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M6 18L18 6M6 6l12 12" />
@@ -180,9 +198,12 @@ const CloseIcon = ({ className }: { className?: string }) => (
 );
 
 type UploadItem = {
+  id: string;
   file: File;
+  key: string;
   progress: number;
-  status: "pending" | "uploading" | "success" | "error";
+  speed: string;
+  status: "pending" | "uploading" | "success" | "error" | "paused";
   error?: string;
 };
 
@@ -199,7 +220,7 @@ const Home: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const xhrRefs = useRef<Map<File, XMLHttpRequest>>(new Map());
+  const xhrRefs = useRef<Map<string, XMLHttpRequest>>(new Map());
 
   const fetchFiles = async () => {
     try {
@@ -244,6 +265,17 @@ const Home: React.FC = () => {
     window.addEventListener("trigger-upload", handleTrigger);
     return () => window.removeEventListener("trigger-upload", handleTrigger);
   }, []);
+
+  // 上传队列处理器：限制同时上传 1 个文件
+  useEffect(() => {
+    const uploadingCount = uploadQueue.filter(item => item.status === 'uploading').length;
+    if (uploadingCount < 1) {
+      const nextItem = uploadQueue.find(item => item.status === 'pending');
+      if (nextItem) {
+        startUpload(nextItem);
+      }
+    }
+  }, [uploadQueue]);
 
   useEffect(() => {
     let files = rootFiles;
@@ -305,18 +337,15 @@ const Home: React.FC = () => {
     setPath(path.slice(0, idx + 1));
   };
 
-  // 上传核心逻辑
-  const uploadFile = async (file: File, prefix: string) => {
-    const key = prefix + file.name;
-    
-    // 更新状态为上传中
-    setUploadQueue(prev => prev.map(item => item.file === file ? { ...item, status: "uploading" } : item));
+  // 开始上传单个文件
+  const startUpload = async (item: UploadItem) => {
+    setUploadQueue(prev => prev.map(i => i.id === item.id ? { ...i, status: "uploading" } : i));
 
     try {
       // 1. 获取预签名 URL
       const signRes = await fetch("/api/upload", {
         method: "POST",
-        body: JSON.stringify({ filename: key, contentType: file.type }),
+        body: JSON.stringify({ filename: item.key, contentType: item.file.type }),
       });
       
       if (!signRes.ok) throw new Error("无法获取上传签名");
@@ -325,26 +354,43 @@ const Home: React.FC = () => {
       // 2. 使用 XHR 上传以获取进度
       return new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        xhrRefs.current.set(file, xhr); // 保存 xhr 引用以便取消
+        xhrRefs.current.set(item.id, xhr);
+
+        let lastLoaded = 0;
+        let lastTime = Date.now();
 
         xhr.open("PUT", url);
-        xhr.setRequestHeader("Content-Type", file.type);
+        xhr.setRequestHeader("Content-Type", item.file.type);
 
         xhr.upload.onprogress = (e) => {
           if (e.lengthComputable) {
+            const now = Date.now();
+            const diffTime = now - lastTime;
             const percent = (e.loaded / e.total) * 100;
+            
+            let speedStr = item.speed;
+            // 每 500ms 更新一次速度
+            if (diffTime >= 500) {
+              const diffLoaded = e.loaded - lastLoaded;
+              const speedBytes = (diffLoaded / diffTime) * 1000;
+              speedStr = formatSize(speedBytes) + "/s";
+              lastLoaded = e.loaded;
+              lastTime = now;
+            }
+
             setUploadQueue(prev => prev.map(item => 
-              item.file === file ? { ...item, progress: percent } : item
+              item.id === item.id ? { ...item, progress: percent, speed: speedStr } : item
             ));
           }
         };
 
         xhr.onload = () => {
-          xhrRefs.current.delete(file);
+          xhrRefs.current.delete(item.id);
           if (xhr.status >= 200 && xhr.status < 300) {
-            setUploadQueue(prev => prev.map(item => 
-              item.file === file ? { ...item, status: "success", progress: 100 } : item
+            setUploadQueue(prev => prev.map(i => 
+              i.id === item.id ? { ...i, status: "success", progress: 100, speed: "" } : i
             ));
+            fetchFiles(); // 单个文件上传成功后刷新列表
             resolve();
           } else {
             reject(new Error(`Upload failed: ${xhr.statusText}`));
@@ -352,32 +398,45 @@ const Home: React.FC = () => {
         };
 
         xhr.onerror = () => {
-          xhrRefs.current.delete(file);
+          xhrRefs.current.delete(item.id);
           reject(new Error("网络错误 (请检查 R2 CORS 配置)"));
         };
 
         xhr.onabort = () => {
-          xhrRefs.current.delete(file);
+          xhrRefs.current.delete(item.id);
           reject(new Error("已取消"));
         };
 
-        xhr.send(file);
+        xhr.send(item.file);
       });
     } catch (e: unknown) {
       console.error(e);
       const message = e instanceof Error ? e.message : String(e);
-      // 如果是取消，状态设为 error 但提示不同
-      setUploadQueue(prev => prev.map(item => 
-        item.file === file ? { ...item, status: "error", error: message } : item
+      // 如果是手动暂停/取消，状态可能已经被设置了，这里只处理真正的错误
+      setUploadQueue(prev => prev.map(i => 
+        i.id === item.id && i.status !== 'paused' ? { ...i, status: "error", error: message } : i
       ));
     }
   };
 
-  const handleCancelUpload = (file: File) => {
-    const xhr = xhrRefs.current.get(file);
+  const handlePauseUpload = (id: string) => {
+    const xhr = xhrRefs.current.get(id);
     if (xhr) {
       xhr.abort();
     }
+    setUploadQueue(prev => prev.map(i => i.id === id ? { ...i, status: "paused" } : i));
+  };
+
+  const handleResumeUpload = (id: string) => {
+    setUploadQueue(prev => prev.map(i => i.id === id ? { ...i, status: "pending", error: undefined } : i));
+  };
+
+  const handleRemoveUpload = (id: string) => {
+    const xhr = xhrRefs.current.get(id);
+    if (xhr) {
+      xhr.abort();
+    }
+    setUploadQueue(prev => prev.filter(i => i.id !== id));
   };
 
   const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -391,19 +450,17 @@ const Home: React.FC = () => {
     const prefix = path.length > 0 ? path.join("/") + "/" : "";
     
     // 添加到队列
-    const newItems: UploadItem[] = files.map(f => ({
+    const newItems: UploadItem[] = files.map((f) => ({
+      id: Math.random().toString(36).substring(2, 9),
       file: f,
+      key: prefix + f.name,
       progress: 0,
+      speed: "0 B/s",
       status: "pending"
     }));
     
     setUploadQueue(prev => [...prev, ...newItems]);
     setShowUploadModal(true);
-
-    // 并发上传
-    await Promise.all(files.map(f => uploadFile(f, prefix)));
-    
-    fetchFiles(); // 刷新列表
   };
 
   // 拖拽处理
@@ -426,28 +483,8 @@ const Home: React.FC = () => {
     }
   };
 
-  // 计算总进度
-  const totalProgress = useMemo(() => {
-    if (uploadQueue.length === 0) return 0;
-    const total = uploadQueue.reduce((acc, item) => acc + item.progress, 0);
-    return total / uploadQueue.length;
-  }, [uploadQueue]);
-
   return (
-    <div 
-      className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 transition-colors relative"
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-    >
-      {/* 拖拽遮罩层 */}
-      {isDragging && (
-        <div className="absolute inset-0 z-50 bg-blue-500/10 backdrop-blur-sm border-4 border-blue-500 border-dashed m-4 rounded-2xl flex items-center justify-center pointer-events-none">
-          <div className="text-3xl font-bold text-blue-600 dark:text-blue-400 animate-bounce">
-            释放文件以上传
-          </div>
-        </div>
-      )}
+    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 transition-colors relative">
 
       <div className="flex-1 w-full mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 flex flex-col">
         
@@ -792,73 +829,103 @@ const Home: React.FC = () => {
         </div>
       )}
 
-      {/* 上传进度面板 */}
+      {/* 上传对话框 */}
       {showUploadModal && (
-        <div className="fixed bottom-6 left-6 z-50 w-full max-w-md bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-800 overflow-hidden flex flex-col animate-fade-in-up">
-          {/* 面板头部 */}
-          <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="font-medium text-sm">上传队列</span>
-              <span className="text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 px-2 py-0.5 rounded-full">
-                {uploadQueue.filter(i => i.status === 'success').length}/{uploadQueue.length}
-              </span>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-2xl bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 overflow-hidden flex flex-col max-h-[80vh]">
+            {/* 对话框头部 */}
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between bg-gray-50 dark:bg-gray-800/50">
+              <h3 className="text-lg font-semibold">文件上传</h3>
+              <button 
+                onClick={() => setShowUploadModal(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              >
+                <CloseIcon className="h-5 w-5" />
+              </button>
             </div>
-            <button 
-              onClick={() => setShowUploadModal(false)}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-            >
-              <CloseIcon className="h-4 w-4" />
-            </button>
-          </div>
 
-          {/* 总进度条 */}
-          <div className="h-1 w-full bg-gray-100 dark:bg-gray-800">
+            {/* 拖拽区域 */}
             <div 
-              className="h-full bg-blue-500 transition-all duration-300 ease-out"
-              style={{ width: `${totalProgress}%` }}
-            />
-          </div>
-
-          {/* 文件列表 */}
-          <div className="max-h-60 overflow-y-auto p-2 space-y-2">
-            {uploadQueue.map((item, idx) => (
-              <div key={idx} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                <div className="flex-shrink-0">
-                  {getFileIconSvg(item.file.type)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex justify-between mb-1">
-                    <span className="text-xs font-medium truncate max-w-[180px]">{item.file.name}</span>
-                    <span className="text-xs text-gray-500">{Math.round(item.progress)}%</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-                    <div 
-                      className={`h-full rounded-full transition-all duration-300 ${
-                        item.status === 'error' ? 'bg-red-500' : 
-                        item.status === 'success' ? 'bg-green-500' : 'bg-blue-500'
-                      }`}
-                      style={{ width: `${item.progress}%` }}
-                    />
-                  </div>
-                  {item.status === 'error' && (
-                    <p className="text-[10px] text-red-500 mt-1 truncate">{item.error}</p>
-                  )}
-                </div>
-                <div className="flex-shrink-0">
-                  {item.status === 'success' && <span className="text-green-500 text-xs">完成</span>}
-                  {item.status === 'uploading' && <span className="text-blue-500 text-xs animate-pulse">上传中</span>}
-                  {item.status === 'uploading' && (
-                    <button 
-                      onClick={() => handleCancelUpload(item.file)}
-                      className="text-gray-400 hover:text-red-500 transition-colors ml-2"
-                      title="取消上传"
-                    >
-                      <CloseIcon className="h-3 w-3" />
-                    </button>
-                  )}
-                </div>
+              className={`mx-6 mt-6 border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center text-center transition-colors ${
+                isDragging 
+                  ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20" 
+                  : "border-gray-300 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500"
+              }`}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+            >
+              <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full text-blue-600 dark:text-blue-400 mb-3">
+                <UploadIcon className="h-8 w-8" />
               </div>
-            ))}
+              <p className="text-sm font-medium text-gray-900 dark:text-white">
+                拖拽文件到此处，或 <button onClick={handleUploadClick} className="text-blue-600 hover:underline">点击选择</button>
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                支持多文件上传，单文件最大 5GB
+              </p>
+            </div>
+
+            {/* 文件列表 */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-3">
+              {uploadQueue.length === 0 && (
+                <p className="text-center text-sm text-gray-500 py-4">暂无上传任务</p>
+              )}
+              {uploadQueue.map((item) => (
+                <div key={item.id} className="flex items-center gap-4 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-100 dark:border-gray-800">
+                  <div className="flex-shrink-0">
+                    {getFileIconSvg(item.file.type)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-sm font-medium truncate max-w-[200px] sm:max-w-xs" title={item.file.name}>{item.file.name}</span>
+                      <span className="text-xs text-gray-500 font-mono">
+                        {item.status === 'uploading' ? item.speed : formatSize(item.file.size)}
+                      </span>
+                    </div>
+                    
+                    {/* 只有正在上传的文件显示进度条 */}
+                    {item.status === 'uploading' && (
+                      <div className="h-1.5 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-blue-500 rounded-full transition-all duration-300"
+                          style={{ width: `${item.progress}%` }}
+                        />
+                      </div>
+                    )}
+                    
+                    {item.status === 'error' && <p className="text-xs text-red-500 mt-1">{item.error}</p>}
+                    {item.status === 'paused' && <p className="text-xs text-orange-500 mt-1">已暂停</p>}
+                    {item.status === 'pending' && <p className="text-xs text-gray-400 mt-1">等待上传...</p>}
+                  </div>
+
+                  <div className="flex-shrink-0 flex items-center gap-2">
+                    {item.status === 'success' ? (
+                      <span className="text-green-500 text-sm font-medium flex items-center gap-1">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                        完成
+                      </span>
+                    ) : (
+                      <>
+                        {item.status === 'uploading' && (
+                          <button onClick={() => handlePauseUpload(item.id)} className="text-gray-400 hover:text-orange-500 p-1" title="暂停">
+                            <PauseIcon className="h-5 w-5" />
+                          </button>
+                        )}
+                        {(item.status === 'paused' || item.status === 'error') && (
+                          <button onClick={() => handleResumeUpload(item.id)} className="text-gray-400 hover:text-blue-500 p-1" title="重试/继续">
+                            <PlayIcon className="h-5 w-5" />
+                          </button>
+                        )}
+                        <button onClick={() => handleRemoveUpload(item.id)} className="text-gray-400 hover:text-red-500 p-1" title="取消/删除">
+                          <TrashIcon className="h-5 w-5" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
