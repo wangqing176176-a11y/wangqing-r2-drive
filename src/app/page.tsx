@@ -267,7 +267,7 @@ const Home: React.FC = () => {
 
   // 监听导航栏的上传按钮事件
   useEffect(() => {
-    const handleTrigger = () => fileInputRef.current?.click();
+    const handleTrigger = () => setShowUploadModal(true);
     window.addEventListener("trigger-upload", handleTrigger);
     return () => window.removeEventListener("trigger-upload", handleTrigger);
   }, []);
@@ -446,6 +446,10 @@ const Home: React.FC = () => {
   };
 
   const handleUploadClick = () => {
+    setShowUploadModal(true);
+  };
+
+  const handleSelectFile = () => {
     fileInputRef.current?.click();
   };
 
@@ -869,7 +873,7 @@ const Home: React.FC = () => {
                 <UploadIcon className="h-8 w-8" />
               </div>
               <p className="text-sm font-medium text-gray-900 dark:text-white">
-                拖拽文件到此处，或 <button onClick={handleUploadClick} className="text-blue-600 hover:underline">点击选择</button>
+                拖拽文件到此处，或 <button onClick={handleSelectFile} className="text-blue-600 hover:underline">点击选择</button>
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                 支持多文件上传，单文件最大 5GB
@@ -890,7 +894,9 @@ const Home: React.FC = () => {
                     <div className="flex justify-between items-center mb-1">
                       <span className="text-sm font-medium truncate max-w-[200px] sm:max-w-xs" title={item.file.name}>{item.file.name}</span>
                       <span className="text-xs text-gray-500 font-mono">
-                        {item.status === 'uploading' ? item.speed : formatSize(item.file.size)}
+                        {item.status === 'uploading' 
+                          ? `${Math.round(item.progress)}% · ${item.speed}` 
+                          : formatSize(item.file.size)}
                       </span>
                     </div>
                     
