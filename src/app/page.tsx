@@ -181,6 +181,7 @@ const Home: React.FC = () => {
   const [copied, setCopied] = useState<string | null>(null);
   const [search, setSearch] = useState<string>("");
   const [notice, setNotice] = useState<string | null>(null);
+  const [isVideoBuffering, setIsVideoBuffering] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchFiles = async () => {
@@ -265,6 +266,9 @@ const Home: React.FC = () => {
       return;
     }
     setPreview(file);
+    if (file.type.startsWith("video/")) {
+      setIsVideoBuffering(true);
+    }
   };
 
   const handleClosePreview = () => setPreview(null);
@@ -567,11 +571,20 @@ const Home: React.FC = () => {
                 />
               )}
               {preview.type.startsWith("video/") && (
-                <div className="relative w-full max-w-5xl aspect-video rounded-xl overflow-hidden shadow-[0_0_40px_rgba(0,0,0,0.5)] bg-black border border-gray-800">
+                <div className="relative w-auto h-auto max-w-full max-h-full aspect-video rounded-xl overflow-hidden shadow-2xl bg-black border border-gray-800 flex items-center justify-center">
+                  {isVideoBuffering && (
+                    <div className="absolute inset-0 flex items-center justify-center z-10 bg-black/50 pointer-events-none">
+                      <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                  )}
                   <video
                     src={getCustomUrl(preview.url) || ""}
                     controls
-                    className="w-full h-full"
+                    className="w-full h-full object-contain"
+                    onLoadStart={() => setIsVideoBuffering(true)}
+                    onWaiting={() => setIsVideoBuffering(true)}
+                    onCanPlay={() => setIsVideoBuffering(false)}
+                    onPlaying={() => setIsVideoBuffering(false)}
                   />
                 </div>
               )}
