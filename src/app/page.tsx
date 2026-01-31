@@ -17,7 +17,7 @@ const getCustomUrl = (url?: string) => {
     // 如果是完整 URL，尝试替换 hostname
     const urlObj = new URL(url.startsWith("http") ? url : `https://r2cloud.qinghub.top${url}`);
     return urlObj.toString();
-  } catch (e) {
+  } catch {
     // 如果是相对路径，直接拼接
     if (url.startsWith("/")) {
       return `https://r2cloud.qinghub.top${url}`;
@@ -196,14 +196,14 @@ const Home: React.FC = () => {
         throw new Error("返回数据格式错误，应为数组");
       }
       setRootFiles(data);
-    } catch (err: any) {
-      setNotice(`加载失败: ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      setNotice(`加载失败: ${message}`);
       console.error(err);
     }
   };
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchFiles();
   }, []);
 
@@ -230,7 +230,6 @@ const Home: React.FC = () => {
         break;
       }
     }
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCurrentFiles(files);
   }, [path, rootFiles]);
 
@@ -250,12 +249,6 @@ const Home: React.FC = () => {
       fullPath: [...path, file.name],
     }));
   }, [currentFiles, path, searchResults]);
-
-  const stats = useMemo(() => {
-    const folders = currentFiles.filter((file) => file.type === "folder").length;
-    const files = currentFiles.length - folders;
-    return { folders, files };
-  }, [currentFiles]);
 
   const handleCopy = (url: string) => {
     copyToClipboard(url);
@@ -281,10 +274,6 @@ const Home: React.FC = () => {
 
   const handleBreadcrumbClick = (idx: number) => {
     setPath(path.slice(0, idx + 1));
-  };
-
-  const handleUploadClick = () => {
-    fileInputRef.current?.click();
   };
 
   const handleFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -473,7 +462,7 @@ const Home: React.FC = () => {
         {/* 底部版权栏 */}
         <footer className="mt-auto py-6 border-t border-gray-200 dark:border-gray-800">
           <div className="flex flex-col md:flex-row items-center justify-center gap-4 text-sm text-gray-500 dark:text-gray-400">
-            <span>© {new Date().getFullYear()} WanQing's R2 Drive.</span>
+            <span>© {new Date().getFullYear()} WanQing&apos;s R2 Drive.</span>
             
             <div className="hidden md:block w-px h-4 bg-gray-300 dark:bg-gray-700"></div>
             
