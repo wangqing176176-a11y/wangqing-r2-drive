@@ -445,10 +445,6 @@ const Home: React.FC = () => {
     setUploadQueue(prev => prev.filter(i => i.id !== id));
   };
 
-  const handleUploadClick = () => {
-    setShowUploadModal(true);
-  };
-
   const handleSelectFile = () => {
     fileInputRef.current?.click();
   };
