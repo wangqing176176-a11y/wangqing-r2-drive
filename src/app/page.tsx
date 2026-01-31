@@ -56,15 +56,6 @@ const getFileIconSvg = (type: string) => {
       </svg>
     );
   }
-  if (type.includes("word") || type.includes("document")) {
-    return (
-      <svg viewBox="0 0 24 24" className="h-8 w-8 text-blue-600" fill="currentColor">
-        <path fillRule="evenodd" d="M5.625 1.5c-1.036 0-1.875.84-1.875 1.875v17.25c0 1.035.84 1.875 1.875 1.875h12.75c1.035 0 1.875-.84 1.875-1.875V12.75A3.75 3.75 0 0 0 16.5 9h-1.875a1.875 1.875 0 0 1-1.875-1.875V5.25A3.75 3.75 0 0 0 9 1.5H5.625ZM7.5 15a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5h-7.5A.75.75 0 0 1 7.5 15Zm.75 2.25a.75.75 0 0 0 0 1.5H12a.75.75 0 0 0 0-1.5H8.25Z" clipRule="evenodd" />
-        <path d="M12.971 1.816A5.23 5.23 0 0 1 14.25 5.25v1.875c0 .207.168.375.375.375H16.5a5.23 5.23 0 0 1 3.434 1.279 9.768 9.768 0 0 0-6.963-6.963Z" />
-        <text x="8" y="18" fontSize="6" fill="white" fontWeight="bold">W</text>
-      </svg>
-    );
-  }
   if (type.includes("sheet") || type.includes("excel")) {
     return (
       <svg viewBox="0 0 24 24" className="h-8 w-8 text-green-600" fill="currentColor">
@@ -81,6 +72,16 @@ const getFileIconSvg = (type: string) => {
       </svg>
     );
   }
+  // Word 判断放在 Excel 和 PPT 之后，防止误判
+  if (type.includes("word") || type.includes("document")) {
+    return (
+      <svg viewBox="0 0 24 24" className="h-8 w-8 text-blue-600" fill="currentColor">
+        <path fillRule="evenodd" d="M5.625 1.5c-1.036 0-1.875.84-1.875 1.875v17.25c0 1.035.84 1.875 1.875 1.875h12.75c1.035 0 1.875-.84 1.875-1.875V12.75A3.75 3.75 0 0 0 16.5 9h-1.875a1.875 1.875 0 0 1-1.875-1.875V5.25A3.75 3.75 0 0 0 9 1.5H5.625ZM7.5 15a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5h-7.5A.75.75 0 0 1 7.5 15Zm.75 2.25a.75.75 0 0 0 0 1.5H12a.75.75 0 0 0 0-1.5H8.25Z" clipRule="evenodd" />
+        <path d="M12.971 1.816A5.23 5.23 0 0 1 14.25 5.25v1.875c0 .207.168.375.375.375H16.5a5.23 5.23 0 0 1 3.434 1.279 9.768 9.768 0 0 0-6.963-6.963Z" />
+        <text x="8" y="18" fontSize="6" fill="white" fontWeight="bold">W</text>
+      </svg>
+    );
+  }
   if (type.includes("zip") || type.includes("compressed") || type.includes("tar")) {
     return (
       <svg viewBox="0 0 24 24" className="h-8 w-8 text-gray-500" fill="currentColor">
@@ -88,10 +89,10 @@ const getFileIconSvg = (type: string) => {
       </svg>
     );
   }
+  // 默认问号图标
   return (
     <svg viewBox="0 0 24 24" className="h-8 w-8 text-gray-400" fill="currentColor">
-      <path fillRule="evenodd" d="M5.625 1.5c-1.036 0-1.875.84-1.875 1.875v17.25c0 1.035.84 1.875 1.875 1.875h12.75c1.035 0 1.875-.84 1.875-1.875V12.75A3.75 3.75 0 0 0 16.5 9h-1.875a1.875 1.875 0 0 1-1.875-1.875V5.25A3.75 3.75 0 0 0 9 1.5H5.625ZM7.5 15a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5h-7.5A.75.75 0 0 1 7.5 15Zm.75 2.25a.75.75 0 0 0 0 1.5H12a.75.75 0 0 0 0-1.5H8.25Z" clipRule="evenodd" />
-      <path d="M12.971 1.816A5.23 5.23 0 0 1 14.25 5.25v1.875c0 .207.168.375.375.375H16.5a5.23 5.23 0 0 1 3.434 1.279 9.768 9.768 0 0 0-6.963-6.963Z" />
+      <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm11.378-3.917c-.89-.777-2.366-.777-3.255 0a.75.75 0 0 1-.988-1.129c1.454-1.272 3.776-1.272 5.23 0 1.513 1.271 1.513 3.374 0 4.646l-2.114 1.84a.75.75 0 0 1-1.004-1.114l2.114-1.84c.89-.777.89-2.096 0-2.803Zm-4.243 9.045a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" clipRule="evenodd" />
     </svg>
   );
 };
@@ -109,19 +110,19 @@ const getFileMeta = (type: string) => {
   if (type === "application/pdf") {
     return { label: "PDF", tone: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300" };
   }
-  if (type.includes("word") || type.includes("document")) {
-    return { label: "Word", tone: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300" };
-  }
   if (type.includes("sheet") || type.includes("excel")) {
     return { label: "Excel", tone: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" };
   }
   if (type.includes("presentation") || type.includes("powerpoint")) {
     return { label: "PPT", tone: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300" };
   }
+  if (type.includes("word") || type.includes("document")) {
+    return { label: "Word", tone: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300" };
+  }
   if (type.includes("zip") || type.includes("compressed")) {
     return { label: "压缩包", tone: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300" };
   }
-  return { label: "文件", tone: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400" };
+  return { label: "未知", tone: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400" };
 };
 
 const formatSize = (size?: number) => {
@@ -566,13 +567,22 @@ const Home: React.FC = () => {
                 />
               )}
               {preview.type.startsWith("video/") && (
-                <video
+                <div className="relative w-full max-w-5xl aspect-video rounded-xl overflow-hidden shadow-[0_0_40px_rgba(0,0,0,0.5)] bg-black border border-gray-800">
+                  <video
+                    src={getCustomUrl(preview.url) || ""}
+                    controls
+                    className="w-full h-full"
+                  />
+                </div>
+              )}
+              {preview.type === "application/pdf" && (
+                <iframe
                   src={getCustomUrl(preview.url) || ""}
-                  controls
-                  className="w-full max-w-5xl max-h-full rounded-lg shadow-2xl bg-black"
+                  className="w-full h-full bg-white rounded-lg shadow-lg"
+                  title="PDF Preview"
                 />
               )}
-              {(preview.type === "application/pdf" || preview.type.includes("word") || preview.type.includes("document") || preview.type.includes("sheet") || preview.type.includes("excel") || preview.type.includes("presentation") || preview.type.includes("powerpoint")) && (
+              {(preview.type.includes("word") || preview.type.includes("document") || preview.type.includes("sheet") || preview.type.includes("excel") || preview.type.includes("presentation") || preview.type.includes("powerpoint")) && (
                 <iframe
                   src={`https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(
                     getCustomUrl(preview.url) || ""
