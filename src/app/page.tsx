@@ -173,6 +173,12 @@ const DownloadIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
+const UploadIcon = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+  </svg>
+);
+
 const PauseIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
@@ -266,17 +272,6 @@ const Home: React.FC = () => {
     return () => window.removeEventListener("trigger-upload", handleTrigger);
   }, []);
 
-  // 上传队列处理器：限制同时上传 1 个文件
-  useEffect(() => {
-    const uploadingCount = uploadQueue.filter(item => item.status === 'uploading').length;
-    if (uploadingCount < 1) {
-      const nextItem = uploadQueue.find(item => item.status === 'pending');
-      if (nextItem) {
-        startUpload(nextItem);
-      }
-    }
-  }, [uploadQueue]);
-
   useEffect(() => {
     let files = rootFiles;
     for (const folder of path) {
@@ -338,7 +333,7 @@ const Home: React.FC = () => {
   };
 
   // 开始上传单个文件
-  const startUpload = async (item: UploadItem) => {
+  const startUpload = useCallback(async (item: UploadItem) => {
     setUploadQueue(prev => prev.map(i => i.id === item.id ? { ...i, status: "uploading" } : i));
 
     try {
@@ -417,7 +412,18 @@ const Home: React.FC = () => {
         i.id === item.id && i.status !== 'paused' ? { ...i, status: "error", error: message } : i
       ));
     }
-  };
+  }, []);
+
+  // 上传队列处理器：限制同时上传 1 个文件
+  useEffect(() => {
+    const uploadingCount = uploadQueue.filter(item => item.status === 'uploading').length;
+    if (uploadingCount < 1) {
+      const nextItem = uploadQueue.find(item => item.status === 'pending');
+      if (nextItem) {
+        startUpload(nextItem);
+      }
+    }
+  }, [uploadQueue, startUpload]);
 
   const handlePauseUpload = (id: string) => {
     const xhr = xhrRefs.current.get(id);
