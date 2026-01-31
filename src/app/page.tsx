@@ -445,6 +445,10 @@ const Home: React.FC = () => {
     setUploadQueue(prev => prev.filter(i => i.id !== id));
   };
 
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
   const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
