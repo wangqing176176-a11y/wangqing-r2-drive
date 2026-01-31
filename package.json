@@ -4,11 +4,6 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
-    "pages:build": "next-on-pages",
-    "start": "next start",
-    "lint": "eslint"
-  },
   "dependencies": {
     "next": "15.1.0",
     "react": "19.2.3",
