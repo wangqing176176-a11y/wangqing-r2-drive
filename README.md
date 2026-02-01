@@ -1,36 +1,111 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Qing R2 Cloudy (WanQing's R2 Drive)
 
-## Getting Started
+!License
+!Next.js
+!Cloudflare
 
-First, run the development server:
+## 📖 简介 (Introduction)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+**Qing R2 Cloudy** 是一个基于 **Next.js 15** 和 **Cloudflare R2** 构建的现代化个人轻量级云盘系统。
+
+它利用 Cloudflare 强大的全球边缘网络，提供极速的文件上传与下载体验。项目完全 Serverless 化，无需购买传统服务器，部署简单，成本极低（甚至免费）。
+
+## ✨ 功能特性 (Features)
+
+*   **📂 文件管理**：支持文件夹层级浏览，清晰的面包屑导航。
+*   **🚀 极速上传**：
+    *   支持**全屏拖拽上传**。
+    *   使用 **R2 预签名 URL (Presigned URL)** 技术，绕过 Cloudflare Pages 的 100MB 请求体限制，支持最大 **5GB** 单文件上传。
+    *   **实时反馈**：显示精确的上传百分比和网络速度。
+    *   **队列管理**：支持多文件队列，自动并发控制，支持暂停、恢复和取消。
+*   **👀 在线预览**：
+    *   **图片**：支持 JPG, PNG, GIF, WEBP, SVG 等主流格式。
+    *   **视频**：支持 MP4, MOV, MKV 等格式，原生播放器体验，自适应 16:9 比例。
+    *   **音频**：支持 MP3, WAV, OGG, FLAC 等格式，带封面预览。
+    *   **文档**：支持 PDF 在线预览，以及 Word, Excel, PPT (通过微软在线服务预览)。
+    *   **代码**：支持常见代码文件（JS, PY, JAVA, HTML 等）的图标识别。
+*   **🔍 搜索与排序**：支持按文件名实时搜索；支持按上传时间、文件大小、名称进行升序/降序排列。
+*   **🔐 安全机制**：
+    *   前端管理员登录验证（防止未授权用户上传文件）。
+    *   上传接口签名验证，确保只有通过验证的请求才能写入存储桶。
+*   **🎨 现代化 UI**：
+    *   基于 **Tailwind CSS 4** 构建，界面简洁美观。
+    *   完美支持 **深色模式 (Dark Mode)**，自动跟随系统。
+    *   响应式设计，完美适配桌面端和移动端。
+
+## 🌟 项目优势 (Advantages)
+
+1.  **Serverless 架构**：完全部署在 Cloudflare Pages 上，无需维护服务器，运维成本为零。
+2.  **超低成本**：Cloudflare R2 存储拥有慷慨的免费额度（10GB 存储，海量 A/B 类操作），且**免流出流量费**。
+3.  **高性能**：利用 Cloudflare 全球边缘网络，无论身在何处，访问速度都极快。
+4.  **大文件支持**：通过预签名 URL 方案，轻松处理 GB 级别的大文件上传。
+
+## 🛠️ 部署与配置 (Deployment & Configuration)
+
+### 1. 准备工作
+*   一个 Cloudflare 账号。
+*   一个 GitHub 账号。
+
+### 2. Cloudflare R2 配置
+1.  在 Cloudflare Dashboard 中创建一个 R2 存储桶。
+2.  **配置 CORS**（**关键步骤**，否则无法上传）：
+    进入存储桶 -> **Settings** -> **CORS Policy**，添加以下配置：
+    ```json
+    [
+      {
+        "AllowedOrigins": ["*"], // 生产环境建议修改为你的实际域名
+        "AllowedMethods": ["PUT", "GET", "DELETE", "HEAD"],
+        "AllowedHeaders": ["*"],
+        "ExposeHeaders": ["ETag"],
+        "MaxAgeSeconds": 3000
+      }
+    ]
+    ```
+3.  **绑定自定义域名**（推荐）：在 **Settings** -> **Public Access** -> **Custom Domains** 中绑定一个域名，用于文件访问。
+
+### 3. 部署到 Cloudflare Pages
+1.  Fork 本仓库到你的 GitHub。
+2.  在 Cloudflare Pages 中创建新项目，连接你的 GitHub 仓库。
+3.  **构建设置 (Build settings)**：
+    *   **Framework preset**: `Next.js`
+    *   **Build command**: `npm run pages:build`
+    *   **Build output directory**: `.vercel/output/static`
+    *   **Compatibility flags**: 添加 `nodejs_compat`
+4.  **环境变量 (Environment variables)**：
+    在 Pages 项目设置中添加以下变量：
+    *   `R2_ACCOUNT_ID`: 你的 Cloudflare Account ID
+    *   `R2_ACCESS_KEY_ID`: 你的 Access Key ID
+    *   `R2_SECRET_ACCESS_KEY`: 你的 Secret Access Key
+5.  **绑定 R2 存储桶**：
+    在 Pages 项目设置 -> **Functions** -> **R2 Bucket Bindings** 中：
+    *   Variable name: `BUCKET` (**必须是这个名字**)
+    *   R2 Bucket: 选择你创建的存储桶
+
+### 4. 个性化配置
+
+修改 `src/app/page.tsx` 文件中的配置：
+
+```typescript
+// 修改管理员账号密码 (约 180 行)
+const handleLogin = () => {
+  if (username === "admin" && password === "admin") { // 修改这里的账号密码
+    // ...
+  }
+}
+
+// 修改自定义域名 (约 15 行)
+const getCustomUrl = (url?: string) => {
+  // 将 https://r2cloud.qinghub.top 替换为你自己的 R2 域名
+  const urlObj = new URL(url.startsWith("http") ? url : `https://your-domain.com${url}`);
+  // ...
+}
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🤝 致谢 (Credits)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+*   本项目由 **WanQing** 开发与维护。
+*   特别感谢 **Gemini Code Assist** 提供全程代码辅助、架构设计与技术支持。🤖❤️
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 📄 开源协议 (License)
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+MIT License
