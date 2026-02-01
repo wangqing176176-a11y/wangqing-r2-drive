@@ -857,7 +857,7 @@ const Home: React.FC = () => {
           onClick={handleClosePreview}
         >
           <div
-            className="relative w-full max-w-6xl h-[90vh] flex flex-col bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden"
+            className="relative w-full max-w-6xl h-[70vh] md:h-[90vh] flex flex-col bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden"
             onClick={(event) => event.stopPropagation()}
           >
             {/* 模态框头部 */}
