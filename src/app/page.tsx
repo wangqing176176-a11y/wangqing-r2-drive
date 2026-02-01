@@ -26,7 +26,9 @@ const getCustomUrl = (url?: string) => {
   }
 };
 
-const getFileIconSvg = (type: string) => {
+const getFileIconSvg = (name: string, type: string) => {
+  const lowerName = name.toLowerCase();
+
   if (type === "folder") {
     return (
       <svg viewBox="0 0 24 24" className="h-8 w-8 text-yellow-400" fill="currentColor">
@@ -34,21 +36,28 @@ const getFileIconSvg = (type: string) => {
       </svg>
     );
   }
-  if (type.startsWith("image/")) {
+  if (type.startsWith("image/") || /\.(jpg|jpeg|png|gif|webp|svg|bmp|ico|tiff)$/i.test(lowerName)) {
     return (
       <svg viewBox="0 0 24 24" className="h-8 w-8 text-purple-500" fill="currentColor">
         <path fillRule="evenodd" d="M1.5 6a2.25 2.25 0 0 1 2.25-2.25h16.5A2.25 2.25 0 0 1 22.5 6v12a2.25 2.25 0 0 1-2.25 2.25H3.75A2.25 2.25 0 0 1 1.5 18V6ZM3 16.06V18c0 .414.336.75.75.75h16.5A.75.75 0 0 0 21 18v-1.94l-2.69-2.689a1.5 1.5 0 0 0-2.12 0l-.88.879.97.97a.75.75 0 1 1-1.06 1.06l-5.16-5.159a1.5 1.5 0 0 0-2.12 0L3 16.061Zm10.125-7.81a1.125 1.125 0 1 1 2.25 0 1.125 1.125 0 0 1-2.25 0Z" clipRule="evenodd" />
       </svg>
     );
   }
-  if (type.startsWith("video/")) {
+  if (type.startsWith("video/") || /\.(mp4|webm|ogg|mov|mkv|avi|m4v)$/i.test(lowerName)) {
     return (
       <svg viewBox="0 0 24 24" className="h-8 w-8 text-rose-500" fill="currentColor">
         <path d="M4.5 4.5a3 3 0 0 0-3 3v9a3 3 0 0 0 3 3h8.25a3 3 0 0 0 3-3v-9a3 3 0 0 0-3-3H4.5ZM19.94 18.75l-2.69-2.69V7.94l2.69-2.69c.944-.945 2.56-.276 2.56 1.06v11.38c0 1.336-1.616 2.005-2.56 1.06Z" />
       </svg>
     );
   }
-  if (type === "application/pdf") {
+  if (type.startsWith("audio/") || /\.(mp3|wav|ogg|m4a|flac|aac|wma)$/i.test(lowerName)) {
+    return (
+      <svg viewBox="0 0 24 24" className="h-8 w-8 text-cyan-500" fill="currentColor">
+        <path d="M19.957 4.297a.75.75 0 0 0-1.207-.594l-10.5 6.562a.75.75 0 0 0-.35.643v9.842a3.75 3.75 0 1 0 1.5 3.15V11.556l9.057-5.66v4.604a3.75 3.75 0 1 0 1.5 3.15V4.297Z" />
+      </svg>
+    );
+  }
+  if (type === "application/pdf" || lowerName.endsWith(".pdf")) {
     return (
       <svg viewBox="0 0 24 24" className="h-8 w-8 text-red-500" fill="currentColor">
         <path fillRule="evenodd" d="M5.625 1.5c-1.036 0-1.875.84-1.875 1.875v17.25c0 1.035.84 1.875 1.875 1.875h12.75c1.035 0 1.875-.84 1.875-1.875V12.75A3.75 3.75 0 0 0 16.5 9h-1.875a1.875 1.875 0 0 1-1.875-1.875V5.25A3.75 3.75 0 0 0 9 1.5H5.625ZM7.5 15a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5h-7.5A.75.75 0 0 1 7.5 15Zm.75 2.25a.75.75 0 0 0 0 1.5H12a.75.75 0 0 0 0-1.5H8.25Z" clipRule="evenodd" />
@@ -56,7 +65,7 @@ const getFileIconSvg = (type: string) => {
       </svg>
     );
   }
-  if (type.includes("sheet") || type.includes("excel")) {
+  if (type.includes("sheet") || type.includes("excel") || /\.(xlsx|xls|csv)$/i.test(lowerName)) {
     return (
       <svg viewBox="0 0 24 24" className="h-8 w-8 text-green-600" fill="currentColor">
         <path fillRule="evenodd" d="M5.625 1.5c-1.036 0-1.875.84-1.875 1.875v17.25c0 1.035.84 1.875 1.875 1.875h12.75c1.035 0 1.875-.84 1.875-1.875V12.75A3.75 3.75 0 0 0 16.5 9h-1.875a1.875 1.875 0 0 1-1.875-1.875V5.25A3.75 3.75 0 0 0 9 1.5H5.625ZM7.5 15a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5h-7.5A.75.75 0 0 1 7.5 15Zm.75 2.25a.75.75 0 0 0 0 1.5H12a.75.75 0 0 0 0-1.5H8.25Z" clipRule="evenodd" />
@@ -64,7 +73,7 @@ const getFileIconSvg = (type: string) => {
       </svg>
     );
   }
-  if (type.includes("presentation") || type.includes("powerpoint")) {
+  if (type.includes("presentation") || type.includes("powerpoint") || /\.(pptx|ppt)$/i.test(lowerName)) {
     return (
       <svg viewBox="0 0 24 24" className="h-8 w-8 text-orange-500" fill="currentColor">
         <path fillRule="evenodd" d="M5.625 1.5c-1.036 0-1.875.84-1.875 1.875v17.25c0 1.035.84 1.875 1.875 1.875h12.75c1.035 0 1.875-.84 1.875-1.875V12.75A3.75 3.75 0 0 0 16.5 9h-1.875a1.875 1.875 0 0 1-1.875-1.875V5.25A3.75 3.75 0 0 0 9 1.5H5.625ZM7.5 15a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5h-7.5A.75.75 0 0 1 7.5 15Zm.75 2.25a.75.75 0 0 0 0 1.5H12a.75.75 0 0 0 0-1.5H8.25Z" clipRule="evenodd" />
@@ -73,7 +82,7 @@ const getFileIconSvg = (type: string) => {
     );
   }
   // Word 判断放在 Excel 和 PPT 之后，防止误判
-  if (type.includes("word") || type.includes("document")) {
+  if (type.includes("word") || type.includes("document") || /\.(docx|doc)$/i.test(lowerName)) {
     return (
       <svg viewBox="0 0 24 24" className="h-8 w-8 text-blue-600" fill="currentColor">
         <path fillRule="evenodd" d="M5.625 1.5c-1.036 0-1.875.84-1.875 1.875v17.25c0 1.035.84 1.875 1.875 1.875h12.75c1.035 0 1.875-.84 1.875-1.875V12.75A3.75 3.75 0 0 0 16.5 9h-1.875a1.875 1.875 0 0 1-1.875-1.875V5.25A3.75 3.75 0 0 0 9 1.5H5.625ZM7.5 15a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5h-7.5A.75.75 0 0 1 7.5 15Zm.75 2.25a.75.75 0 0 0 0 1.5H12a.75.75 0 0 0 0-1.5H8.25Z" clipRule="evenodd" />
@@ -82,10 +91,27 @@ const getFileIconSvg = (type: string) => {
       </svg>
     );
   }
-  if (type.includes("zip") || type.includes("compressed") || type.includes("tar") || type.includes("rar")) {
+  if (type.includes("zip") || type.includes("compressed") || /\.(zip|rar|7z|tar|gz|bz2)$/i.test(lowerName)) {
     return (
       <svg viewBox="0 0 24 24" className="h-8 w-8 text-gray-500" fill="currentColor">
         <path fillRule="evenodd" d="M6 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3h12a3 3 0 0 0 3-3V6a3 3 0 0 0-3-3H6Zm1.5 1.5a.75.75 0 0 0-.75.75v1.5a.75.75 0 0 0 .75.75h1.5a.75.75 0 0 0 .75-.75v-1.5a.75.75 0 0 0-.75-.75h-1.5ZM6 9.75A.75.75 0 0 1 6.75 9h1.5a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-.75.75h-1.5a.75.75 0 0 1-.75-.75v-1.5Zm.75 3.75a.75.75 0 0 0-.75.75v1.5a.75.75 0 0 0 .75.75h1.5a.75.75 0 0 0 .75-.75v-1.5a.75.75 0 0 0-.75-.75h-1.5Z" clipRule="evenodd" />
+      </svg>
+    );
+  }
+  // 代码文件
+  if (/\.(html|css|js|jsx|ts|tsx|json|java|py|go|c|cpp|h|cs|php|rb|sh|bat|cmd|xml|yaml|yml|sql|rs|swift|kt)$/i.test(lowerName)) {
+    return (
+      <svg viewBox="0 0 24 24" className="h-8 w-8 text-indigo-500" fill="currentColor">
+        <path fillRule="evenodd" d="M14.447 3.026a.75.75 0 0 1 .527.921l-4.5 16.5a.75.75 0 0 1-1.448-.394l4.5-16.5a.75.75 0 0 1 .921-.527ZM16.72 6.22a.75.75 0 0 1 1.06 0l5.25 5.25a.75.75 0 0 1 0 1.06l-5.25 5.25a.75.75 0 1 1-1.06-1.06L21.44 12l-4.72-4.72a.75.75 0 0 1 0-1.06Zm-9.44 0a.75.75 0 0 1 0 1.06L2.56 12l4.72 4.72a.75.75 0 0 1-1.06 1.06L.97 12.53a.75.75 0 0 1 0-1.06l5.25-5.25a.75.75 0 0 1 1.06 0Z" clipRule="evenodd" />
+      </svg>
+    );
+  }
+  // 文本/Markdown
+  if (type.startsWith("text/") || /\.(txt|md|markdown|log|ini|conf)$/i.test(lowerName)) {
+    return (
+      <svg viewBox="0 0 24 24" className="h-8 w-8 text-slate-500" fill="currentColor">
+        <path fillRule="evenodd" d="M5.625 1.5c-1.036 0-1.875.84-1.875 1.875v17.25c0 1.035.84 1.875 1.875 1.875h12.75c1.035 0 1.875-.84 1.875-1.875V12.75A3.75 3.75 0 0 0 16.5 9h-1.875a1.875 1.875 0 0 1-1.875-1.875V5.25A3.75 3.75 0 0 0 9 1.5H5.625ZM7.5 15a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5h-7.5A.75.75 0 0 1 7.5 15Zm.75 2.25a.75.75 0 0 0 0 1.5H12a.75.75 0 0 0 0-1.5H8.25Z" clipRule="evenodd" />
+        <path d="M12.971 1.816A5.23 5.23 0 0 1 14.25 5.25v1.875c0 .207.168.375.375.375H16.5a5.23 5.23 0 0 1 3.434 1.279 9.768 9.768 0 0 0-6.963-6.963Z" />
       </svg>
     );
   }
@@ -97,30 +123,41 @@ const getFileIconSvg = (type: string) => {
   );
 };
 
-const getFileMeta = (type: string) => {
+const getFileMeta = (name: string, type: string) => {
+  const lowerName = name.toLowerCase();
+
   if (type === "folder") {
     return { label: "文件夹", tone: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300" };
   }
-  if (type.startsWith("image/")) {
+  if (type.startsWith("image/") || /\.(jpg|jpeg|png|gif|webp|svg|bmp|ico|tiff)$/i.test(lowerName)) {
     return { label: "图片", tone: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300" };
   }
-  if (type.startsWith("video/")) {
+  if (type.startsWith("video/") || /\.(mp4|webm|ogg|mov|mkv|avi|m4v)$/i.test(lowerName)) {
     return { label: "视频", tone: "bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300" };
   }
-  if (type === "application/pdf") {
+  if (type.startsWith("audio/") || /\.(mp3|wav|ogg|m4a|flac|aac|wma)$/i.test(lowerName)) {
+    return { label: "音频", tone: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300" };
+  }
+  if (type === "application/pdf" || lowerName.endsWith(".pdf")) {
     return { label: "PDF", tone: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300" };
   }
-  if (type.includes("sheet") || type.includes("excel")) {
+  if (type.includes("sheet") || type.includes("excel") || /\.(xlsx|xls|csv)$/i.test(lowerName)) {
     return { label: "Excel", tone: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" };
   }
-  if (type.includes("presentation") || type.includes("powerpoint")) {
+  if (type.includes("presentation") || type.includes("powerpoint") || /\.(pptx|ppt)$/i.test(lowerName)) {
     return { label: "PPT", tone: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300" };
   }
-  if (type.includes("word") || type.includes("document")) {
+  if (type.includes("word") || type.includes("document") || /\.(docx|doc)$/i.test(lowerName)) {
     return { label: "Word", tone: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300" };
   }
-  if (type.includes("zip") || type.includes("compressed") || type.includes("tar") || type.includes("rar")) {
+  if (type.includes("zip") || type.includes("compressed") || /\.(zip|rar|7z|tar|gz|bz2)$/i.test(lowerName)) {
     return { label: "压缩包", tone: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300" };
+  }
+  if (/\.(html|css|js|jsx|ts|tsx|json|java|py|go|c|cpp|h|cs|php|rb|sh|bat|cmd|xml|yaml|yml|sql|rs|swift|kt)$/i.test(lowerName)) {
+    return { label: "代码", tone: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300" };
+  }
+  if (type.startsWith("text/") || /\.(txt|md|markdown|log|ini|conf)$/i.test(lowerName)) {
+    return { label: "文本", tone: "bg-slate-100 text-slate-800 dark:bg-slate-900/30 dark:text-slate-300" };
   }
   return { label: "未知", tone: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400" };
 };
@@ -711,7 +748,7 @@ const Home: React.FC = () => {
             <div className="divide-y divide-gray-100 dark:divide-gray-800">
               {visibleNodes.map((node) => {
                 const file = node.item;
-                const meta = getFileMeta(file.type);
+                const meta = getFileMeta(file.name, file.type);
                 const isFolder = file.type === "folder";
                 const customUrl = getCustomUrl(file.url);
 
@@ -732,7 +769,7 @@ const Home: React.FC = () => {
                     {/* 文件名列 */}
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                       <div className="flex-shrink-0">
-                        {getFileIconSvg(file.type)}
+                        {getFileIconSvg(file.name, file.type)}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
@@ -904,14 +941,14 @@ const Home: React.FC = () => {
 
             {/* 预览内容区域 */}
             <div className="flex-1 overflow-auto bg-gray-100 dark:bg-black flex items-center justify-center p-4">
-              {preview.type.startsWith("image/") && (
+              {(preview.type.startsWith("image/") || /\.(jpg|jpeg|png|gif|webp|svg|bmp|ico|tiff)$/i.test(preview.name.toLowerCase())) && (
                 <img
                   src={getCustomUrl(preview.url) || ""}
                   alt={preview.name}
                   className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
                 />
               )}
-              {preview.type.startsWith("video/") && (
+              {(preview.type.startsWith("video/") || /\.(mp4|webm|ogg|mov|mkv|avi|m4v)$/i.test(preview.name.toLowerCase())) && (
                 <div 
                   className="relative w-full max-w-5xl aspect-video bg-black rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.3)] overflow-hidden mx-auto"
                   style={{ maxHeight: '100%' }}
@@ -921,6 +958,21 @@ const Home: React.FC = () => {
                     controls
                     className="w-full h-full object-contain"
                   />
+                </div>
+              )}
+              {(preview.type.startsWith("audio/") || /\.(mp3|wav|ogg|m4a|flac|aac|wma)$/i.test(preview.name.toLowerCase())) && (
+                <div className="w-full max-w-md mx-auto p-6 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="h-16 w-16 bg-cyan-100 dark:bg-cyan-900/30 rounded-full flex items-center justify-center text-cyan-600 dark:text-cyan-400">
+                      <svg className="h-8 w-8" fill="currentColor" viewBox="0 0 24 24"><path d="M19.957 4.297a.75.75 0 0 0-1.207-.594l-10.5 6.562a.75.75 0 0 0-.35.643v9.842a3.75 3.75 0 1 0 1.5 3.15V11.556l9.057-5.66v4.604a3.75 3.75 0 1 0 1.5 3.15V4.297Z" /></svg>
+                    </div>
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white text-center break-all">{preview.name}</h3>
+                    <audio
+                      src={getCustomUrl(preview.url) || ""}
+                      controls
+                      className="w-full"
+                    />
+                  </div>
                 </div>
               )}
               {preview.type === "application/pdf" && (
@@ -939,8 +991,9 @@ const Home: React.FC = () => {
                   title="Office Preview"
                 />
               )}
-              {!preview.type.startsWith("image/") &&
-                !preview.type.startsWith("video/") &&
+              {!(preview.type.startsWith("image/") || /\.(jpg|jpeg|png|gif|webp|svg|bmp|ico|tiff)$/i.test(preview.name.toLowerCase())) &&
+                !(preview.type.startsWith("video/") || /\.(mp4|webm|ogg|mov|mkv|avi|m4v)$/i.test(preview.name.toLowerCase())) &&
+                !(preview.type.startsWith("audio/") || /\.(mp3|wav|ogg|m4a|flac|aac|wma)$/i.test(preview.name.toLowerCase())) &&
                 preview.type !== "application/pdf" &&
                 !preview.type.includes("word") &&
                 !preview.type.includes("document") &&
@@ -950,7 +1003,7 @@ const Home: React.FC = () => {
                 !preview.type.includes("powerpoint") && (
                   <div className="flex flex-col items-center justify-center text-center p-8">
                     <div className="h-24 w-24 bg-gray-200 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
-                      {getFileIconSvg(preview.type)}
+                      {getFileIconSvg(preview.name, preview.type)}
                     </div>
                     <h3 className="text-xl font-medium text-gray-900 dark:text-white mb-2">无法预览此文件</h3>
                     <p className="text-gray-500 dark:text-gray-400 mb-6">此文件类型暂不支持在线预览，请下载后查看。</p>
@@ -1100,7 +1153,7 @@ const Home: React.FC = () => {
               {uploadQueue.map((item) => (
                 <div key={item.id} className="flex items-center gap-4 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-100 dark:border-gray-800">
                   <div className="flex-shrink-0">
-                    {getFileIconSvg(item.file.type)}
+                    {getFileIconSvg(item.file.name, item.file.type)}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-center mb-1">
