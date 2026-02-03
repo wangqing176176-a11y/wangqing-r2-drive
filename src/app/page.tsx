@@ -11,7 +11,7 @@ type FileItem = {
   children?: FileItem[];
 };
 
-// 辅助函数：替换域名为自定义域名
+// 辅助函数：替换域名为自定义域名。
 const getCustomUrl = (url?: string) => {
   if (!url) return "";
   try {
