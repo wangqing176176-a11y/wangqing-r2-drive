@@ -1,4 +1,6 @@
 import { getRequestContext } from "@cloudflare/next-on-pages";
+import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import type { NextRequest } from "next/server";
 
 export const runtime = "edge";
@@ -39,39 +41,43 @@ export async function GET(request: NextRequest) {
     return new Response("Missing required query param: key or path", { status: 400 });
   }
 
-  let env: unknown;
-  try {
-    env = getRequestContext<CloudflareEnv>().env;
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "getRequestContext() failed";
-    return new Response(`Not running on Cloudflare Pages (missing runtime env). ${message}`, { status: 501 });
-  }
-
-  const bucket = (env as CloudflareEnv).BUCKET;
-  if (!bucket) {
-    return new Response("Missing R2 binding: BUCKET", { status: 500 });
+  const ctx = getRequestContext();
+  const env = ctx?.env;
+  if (!env || !env.R2_ACCESS_KEY_ID || !env.R2_SECRET_ACCESS_KEY || !env.R2_ACCOUNT_ID) {
+    return new Response("R2 credentials not configured in environment variables", { status: 500 });
   }
 
   const key = decodeKeyFromPathParam(raw);
-  const obj = await bucket.get(key);
-  if (!obj) {
-    return new Response("Not found", { status: 404 });
-  }
 
   const filename =
     (filenameParam && filenameParam.trim().length > 0 ? filenameParam.trim() : null) ??
     key.split("/").filter(Boolean).pop() ??
     "download";
 
-  const headers = new Headers();
-  obj.writeHttpMetadata(headers);
-  headers.set("Content-Disposition", buildContentDisposition(filename));
-  headers.set("Cache-Control", "no-store");
-  headers.set("X-Content-Type-Options", "nosniff");
-  const size = (obj as unknown as { size?: number }).size;
-  if (typeof size === "number" && Number.isFinite(size) && size >= 0) {
-    headers.set("Content-Length", String(size));
-  }
+  const s3 = new S3Client({
+    region: "auto",
+    endpoint: `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    credentials: {
+      accessKeyId: env.R2_ACCESS_KEY_ID,
+      secretAccessKey: env.R2_SECRET_ACCESS_KEY,
+    },
+  });
 
-  return new Response(obj.body, { headers });
+  const signedUrl = await getSignedUrl(
+    s3,
+    new GetObjectCommand({
+      Bucket: "qing-cloud",
+      Key: key,
+      ResponseContentDisposition: buildContentDisposition(filename),
+    }),
+    { expiresIn: 60 * 10 },
+  );
+
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: signedUrl,
+      "Cache-Control": "no-store",
+    },
+  });
 }
