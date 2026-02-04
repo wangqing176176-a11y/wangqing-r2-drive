@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { assertAdminOrToken, getBucket } from "@/lib/cf";
+import { hasTokenSecret, verifyAccessToken, getBucket } from "@/lib/cf";
 
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
@@ -54,7 +54,12 @@ export async function GET(req: NextRequest) {
     const suggestedName = safeFilename(filename || key.split("/").pop() || "download");
 
     const payload = `object\n${key}\n${download ? "1" : "0"}`;
-    await assertAdminOrToken(req, searchParams, payload);
+if (hasTokenSecret()) {
+  const token = searchParams.get("token") ?? "";
+  if (!token || !(await verifyAccessToken(payload, token))) {
+    return json(401, { error: "Unauthorized" });
+  }
+}
 
     const bucket = getBucket();
 

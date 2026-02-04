@@ -1,4 +1,4 @@
-import { assertAdmin, getBucket } from "@/lib/cf";
+import { getBucket } from "@/lib/cf";
 
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
@@ -157,10 +157,8 @@ const buildTree = (objects: Array<{ key: string; size?: number; uploaded?: Date 
   return Array.from(rootFolder.children.values()).map(materialize);
 };
 
-export async function GET(req: Request) {
+export async function GET() {
   try {
-    assertAdmin(req);
-
     const bucket = getBucket();
 
     const objects: Array<{ key: string; size?: number; uploaded?: Date }> = [];

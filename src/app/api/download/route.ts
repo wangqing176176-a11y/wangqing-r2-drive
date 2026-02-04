@@ -1,14 +1,12 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { assertAdmin, issueAccessToken } from "@/lib/cf";
+import { issueAccessToken } from "@/lib/cf";
 
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
-    assertAdmin(req);
-
     const { searchParams } = new URL(req.url);
     const key = (searchParams.get("key") ?? searchParams.get("path") ?? "").trim();
     const download = searchParams.get("download") === "1";

@@ -331,7 +331,7 @@ const Home: React.FC = () => {
   const handleLogin = async () => {
     try {
       setLoginError("");
-      const res = await fetchWithAuth("/api/files");
+      const res = await fetchWithAuth("/api/auth");
       if (res.status === 401) {
         setLoginError("账号或密码错误，请重试");
         return;
@@ -354,17 +354,10 @@ const Home: React.FC = () => {
       setLoginError("登录失败，请稍后重试");
     }
   };
-
-    const fetchFiles = async () => {
-    if (!loggedIn) return;
+  const fetchFiles = async () => {
     try {
-      const res = await fetchWithAuth("/api/files");
-      if (res.status === 401) {
-        setLoggedIn(false);
-        setNotice('请先登录后再查看文件列表');
-        return;
-      }
-      
+      const res = await fetch("/api/files", { cache: "no-store" });
+
       if (!res.ok) {
         const text = await res.text();
         throw new Error(`API请求失败: ${res.status} ${text.slice(0, 100)}`);
@@ -383,8 +376,8 @@ const Home: React.FC = () => {
   };
 
   useEffect(() => {
-    if (loggedIn) fetchFiles();
-  }, [loggedIn]);
+    fetchFiles();
+  }, []);
 
   // 新增：提示信息 3 秒后自动消失，提升体验
   useEffect(() => {

@@ -73,7 +73,11 @@ const getTokenSecret = (): string | null => {
   const explicit = (env["ADMIN_TOKEN_SECRET"] as string | undefined | null) ?? null;
   if (explicit && String(explicit).length) return String(explicit);
   return getAdminPassword();
+
 };
+
+export const hasTokenSecret = () => Boolean(getTokenSecret());
+
 
 const b64urlEncode = (bytes: Uint8Array) => {
   let base64: string;
