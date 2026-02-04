@@ -784,12 +784,12 @@ const Home: React.FC = () => {
                         {getFileIconSvg(file.name, file.type)}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
                           <span className="truncate text-sm font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                             {file.name}
                           </span>
                           <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${meta.tone}`}
+                            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium shrink-0 whitespace-nowrap ${meta.tone}`}
                           >
                             {meta.label}
                           </span>
