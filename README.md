@@ -58,18 +58,21 @@
 ---
 
 ### 2. 配置 R2 的 CORS（非常重要，否则上传会失败）
-进入你刚创建的 Bucket → **Settings** → **CORS policy**，粘贴下面这一段（新手推荐先用这个，确保能跑起来）：
-    ```json
-    [
-      {
-        "AllowedOrigins": ["*"],
-        "AllowedMethods": ["PUT", "GET", "DELETE", "HEAD"],
-        "AllowedHeaders": ["*"],
-        "ExposeHeaders": ["ETag"],
-        "MaxAgeSeconds": 3000
-      }
-    ]
-    ```
+进入你刚创建的 Bucket → **Settings** → **CORS policy**，粘贴下面这一段（新手推荐先用这个，确保能跑起来）。注意：复制时不要把 ``` 那两行也复制进去。
+
+```json
+[
+  {
+    "AllowedOrigins": ["*"],
+    "AllowedMethods": ["PUT", "GET", "DELETE", "HEAD"],
+    "AllowedHeaders": ["*"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3000
+  }
+]
+```
+
+如果你复制粘贴总是失败：可以直接打开仓库里的 `cors-policy.json`，全选复制粘贴（这是纯 JSON，没有 Markdown 符号）。
 
 如果你希望更安全：后面部署成功后，把 `AllowedOrigins` 从 `*` 改成你自己的站点域名（例如：`https://xxx.pages.dev` 或你的自定义域名）。
 
@@ -120,7 +123,7 @@ Cloudflare 控制台 → **Pages** → **Create a project** → 选择 **Connect
 | `R2_ACCESS_KEY_ID` | ✅ | `xxxxxxxxxxxxxxxx` | R2 Access Key ID |
 | `R2_SECRET_ACCESS_KEY` | ✅ | `xxxxxxxxxxxxxxxxxxxxxxxx` | R2 Secret Access Key |
 | `R2_BUCKET_NAME` | ❌ | `my-drive` | 你的 R2 Bucket 名称 |
-| `NEXT_PUBLIC_R2_BASE_URL` | ❌ | `https://files.example.com` | 你的 R2 文件访问域名（用于预览/复制链接） |
+| **`NEXT_PUBLIC_R2_BASE_URL`** | ❌ | `https://files.example.com` | 你的 R2 文件访问域名（用于预览/复制链接）；**必须以 `https://` 开头、不要以 `/` 结尾** |
 | `NEXT_PUBLIC_ADMIN_USERNAME` | ❌ | `admin` | 管理员账号（前端校验） |
 | `NEXT_PUBLIC_ADMIN_PASSWORD` | ❌ | `change-me` | 管理员密码（前端校验） |
 
@@ -146,7 +149,10 @@ Pages 项目设置 → **Functions** → **R2 Bucket Bindings**：
 ### 3) 能下载但不能预览、复制链接是空的
 需要设置 `NEXT_PUBLIC_R2_BASE_URL`，并确保你的 R2 文件可以通过这个域名直接访问。
 
-### 4) 忘记管理员密码怎么办？
+### 4) 预览/复制链接为空
+多半是 `NEXT_PUBLIC_R2_BASE_URL` 没写 `https://`（或结尾多了 `/`），或者 R2 的公网访问没开启/域名没生效。
+
+### 5) 忘记管理员密码怎么办？
 到 Pages 项目设置里修改 `NEXT_PUBLIC_ADMIN_PASSWORD` 重新部署即可。
 
 ## 🤝 致谢 (Credits)
