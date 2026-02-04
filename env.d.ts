@@ -1,20 +1,18 @@
 interface CloudflareEnv {
   [key: string]: unknown;
   BUCKET: R2Bucket;
-  R2_ACCOUNT_ID: string;
-  R2_ACCESS_KEY_ID: string;
-  R2_SECRET_ACCESS_KEY: string;
-  R2_BUCKET_NAME: string;
+  ADMIN_USERNAME?: string;
+  ADMIN_PASSWORD?: string;
+  ADMIN_TOKEN_SECRET?: string;
 }
 
-// 扩展 Next.js 的 Edge Runtime 类型
+// Extend Next.js Edge Runtime types
 declare global {
   interface CloudflareEnv {
     [key: string]: unknown;
     BUCKET: R2Bucket;
-    R2_ACCOUNT_ID: string;
-    R2_ACCESS_KEY_ID: string;
-    R2_SECRET_ACCESS_KEY: string;
-    R2_BUCKET_NAME: string;
+    ADMIN_USERNAME?: string;
+    ADMIN_PASSWORD?: string;
+    ADMIN_TOKEN_SECRET?: string;
   }
 }

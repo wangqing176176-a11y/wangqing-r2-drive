@@ -1,11 +1,11 @@
-import { getRequestContext } from "@cloudflare/next-on-pages";
+import { assertAdmin, getBucket } from "@/lib/cf";
 
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 type FileItem = {
   name: string;
-  url?: string;
+  key?: string;
   type: string;
   size?: number;
   lastModified: string;
@@ -27,13 +27,6 @@ type InternalNode =
       lastModifiedMs: number;
       mime: string;
     };
-
-const encodeKeyForUrl = (key: string) =>
-  "/" +
-  key
-    .split("/")
-    .map((seg) => encodeURIComponent(seg))
-    .join("/");
 
 const guessMime = (key: string) => {
   const ext = key.split(".").pop()?.toLowerCase() ?? "";
@@ -132,7 +125,7 @@ const buildTree = (objects: Array<{ key: string; size?: number; uploaded?: Date 
     if (node.kind === "file") {
       return {
         name: node.name,
-        url: encodeKeyForUrl(node.key),
+        key: node.key,
         type: node.mime,
         size: node.size,
         lastModified: new Date(node.lastModifiedMs).toISOString(),
@@ -164,45 +157,39 @@ const buildTree = (objects: Array<{ key: string; size?: number; uploaded?: Date 
   return Array.from(rootFolder.children.values()).map(materialize);
 };
 
-export async function GET() {
-  let env: unknown;
+export async function GET(req: Request) {
   try {
-    env = getRequestContext<CloudflareEnv>().env;
-  } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "getRequestContext() failed";
-    return new Response(
-      `Not running on Cloudflare Pages (missing runtime env). ${message}`,
-      { status: 501 },
-    );
-  }
+    assertAdmin(req);
 
-  const bucket = (env as CloudflareEnv).BUCKET;
-  if (!bucket) {
-    return new Response("Missing R2 binding: BUCKET", { status: 500 });
-  }
+    const bucket = getBucket();
 
-  const objects: Array<{ key: string; size?: number; uploaded?: Date }> = [];
-  let cursor: string | undefined = undefined;
+    const objects: Array<{ key: string; size?: number; uploaded?: Date }> = [];
+    let cursor: string | undefined = undefined;
 
-  while (true) {
-    // Cloudflare R2 list API caps page size; loop until fully listed.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const page: any = await bucket.list({ cursor, limit: 1000 });
-    if (Array.isArray(page?.objects)) {
-      objects.push(...page.objects);
+    for (;;) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const page: any = await bucket.list({ cursor, limit: 1000 });
+      if (Array.isArray(page?.objects)) {
+        objects.push(...page.objects);
+      }
+      if (!page?.truncated) break;
+      cursor = page?.cursor;
+      if (!cursor) break;
     }
-    if (!page?.truncated) break;
-    cursor = page?.cursor;
-    if (!cursor) break;
+
+    const tree = buildTree(objects);
+
+    return Response.json(tree, {
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    });
+  } catch (error: unknown) {
+    const status = typeof (error as { status?: unknown })?.status === "number" ? (error as { status: number }).status : 500;
+    const message = error instanceof Error ? error.message : String(error);
+    return new Response(JSON.stringify({ error: message }), {
+      status,
+      headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+    });
   }
-
-  const tree = buildTree(objects);
-
-  return Response.json(tree, {
-    headers: {
-      "Cache-Control": "no-store",
-    },
-  });
 }
-

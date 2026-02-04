@@ -3,37 +3,18 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from "react"
 
 type FileItem = {
   name: string;
-  url?: string;
+  key?: string;
+  url?: string; // resolved via /api/download -> /api/object (tokenized)
   type: string;
   size?: number;
   lastModified: string;
   children?: FileItem[];
 };
 
-const R2_BASE_URL = (process.env.NEXT_PUBLIC_R2_BASE_URL ?? "").trim().replace(/\/+$/, "");
-const ADMIN_USERNAME = (process.env.NEXT_PUBLIC_ADMIN_USERNAME ?? "admin").trim();
-const ADMIN_PASSWORD = (process.env.NEXT_PUBLIC_ADMIN_PASSWORD ?? "admin").trim();
-
-// 辅助函数：替换域名为自定义域名。
-const getCustomUrl = (url?: string) => {
-  if (!url) return "";
-  if (!R2_BASE_URL) return "";
-  try {
-    const base = new URL(R2_BASE_URL + "/");
-    if (url.startsWith("http")) {
-      const src = new URL(url);
-      return new URL(`${src.pathname}${src.search}${src.hash}`, base).toString();
-    }
-    return new URL(url, base).toString();
-  } catch {
-    return "";
-  }
-};
-
-const getDownloadUrl = (path?: string, filename?: string) => {
-  if (!path) return "";
+const buildDownloadRequestUrl = (key: string, filename?: string, download?: boolean) => {
   const params = new URLSearchParams();
-  params.set("path", path);
+  params.set("key", key);
+  if (download) params.set("download", "1");
   if (filename) params.set("filename", filename);
   return `/api/download?${params.toString()}`;
 };
@@ -321,10 +302,12 @@ const Home: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('r2_username');
-    if (storedUser) {
+    const storedUser = localStorage.getItem('admin_username') || localStorage.getItem('r2_username');
+    const storedPw = localStorage.getItem('admin_password');
+    if (storedUser) setUsername(storedUser);
+    if (storedPw) {
+      setPassword(storedPw);
       setLoggedIn(true);
-      setUsername(storedUser);
     }
   }, []);
 
@@ -335,24 +318,52 @@ const Home: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const xhrRefs = useRef<Map<string, XMLHttpRequest>>(new Map());
 
-  const handleLogin = () => {
-    // 简单的前端验证（可通过环境变量 NEXT_PUBLIC_ADMIN_USERNAME / NEXT_PUBLIC_ADMIN_PASSWORD 配置）
-    if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
-      setLoggedIn(true);
-      setLoginError('');
-      if (rememberMe) {
-        localStorage.setItem('r2_username', username);
-      } else {
-        localStorage.removeItem('r2_username');
+  const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
+    const headers: Record<string, string> = {
+      ...(options.headers as Record<string, string> | undefined),
+    };
+    if (!headers["content-type"] && typeof options.body === "string") headers["content-type"] = "application/json";
+    if (username.trim()) headers["x-admin-username"] = username.trim();
+    if (password.trim()) headers["x-admin-password"] = password.trim();
+    return fetch(url, { ...options, headers, cache: "no-store" });
+  };
+
+  const handleLogin = async () => {
+    try {
+      setLoginError("");
+      const res = await fetchWithAuth("/api/files");
+      if (res.status === 401) {
+        setLoginError("账号或密码错误，请重试");
+        return;
       }
-    } else {
-      setLoginError('账号或密码错误，请重试');
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setLoginError(data?.error ? String(data.error) : "登录失败");
+        return;
+      }
+
+      setLoggedIn(true);
+      if (rememberMe) {
+        localStorage.setItem('admin_username', username.trim());
+        localStorage.setItem('admin_password', password.trim());
+      } else {
+        localStorage.removeItem('admin_username');
+        localStorage.removeItem('admin_password');
+      }
+    } catch {
+      setLoginError("登录失败，请稍后重试");
     }
   };
 
-  const fetchFiles = async () => {
+    const fetchFiles = async () => {
+    if (!loggedIn) return;
     try {
-      const res = await fetch("/api/files", { cache: "no-store" });
+      const res = await fetchWithAuth("/api/files");
+      if (res.status === 401) {
+        setLoggedIn(false);
+        setNotice('请先登录后再查看文件列表');
+        return;
+      }
       
       if (!res.ok) {
         const text = await res.text();
@@ -372,8 +383,8 @@ const Home: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchFiles();
-  }, []);
+    if (loggedIn) fetchFiles();
+  }, [loggedIn]);
 
   // 新增：提示信息 3 秒后自动消失，提升体验
   useEffect(() => {
@@ -457,20 +468,31 @@ const Home: React.FC = () => {
     }));
   }, [sortedFiles, path, searchResults]);
 
-  const handleCopy = (url: string) => {
+  const handleCopy = (key: string, url: string) => {
     copyToClipboard(url);
-    setCopied(url);
+    setCopied(key);
     setNotice("链接已复制成功 ✅");
     setTimeout(() => setCopied(null), 2000);
   };
 
-  const handlePreview = (file: FileItem) => {
+  const resolveObjectUrl = async (file: FileItem, download: boolean) => {
+    if (!file.key) throw new Error('Missing file key');
+    const res = await fetchWithAuth(buildDownloadRequestUrl(file.key, file.name, download));
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401) throw new Error('Unauthorized');
+    if (!res.ok || !data.url) throw new Error(data.error || 'Failed to get url');
+    return String(data.url);
+  };
+
+  const handlePreview = async (file: FileItem) => {
     if (file.type === "folder") return;
-    if (!file.url) {
-      setNotice("当前文件没有可访问的 URL，无法预览。请在 Cloudflare Pages 环境变量中配置 NEXT_PUBLIC_R2_BASE_URL。");
-      return;
+    try {
+      const url = await resolveObjectUrl(file, false);
+      setPreview({ ...file, url });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setNotice(`预览失败: ${msg}`);
     }
-    setPreview(file);
   };
 
   const handleClosePreview = () => setPreview(null);
@@ -483,87 +505,141 @@ const Home: React.FC = () => {
     setPath(path.slice(0, idx + 1));
   };
 
-  // 开始上传单个文件
+
+  const MULTIPART_THRESHOLD = 70 * 1024 * 1024; // ~70MiB
+  const PART_SIZE = 70 * 1024 * 1024; // ~70MiB per part
+
+  const xhrPut = (taskId: string, url: string, body: Blob, contentType: string, onProgress: (loaded: number, total: number) => void) => {
+    return new Promise<{ etag?: string }>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhrRefs.current.set(taskId, xhr);
+
+      xhr.open("PUT", url);
+      if (contentType) xhr.setRequestHeader("Content-Type", contentType);
+
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onProgress(e.loaded, e.total);
+      };
+
+      xhr.onload = () => {
+        xhrRefs.current.delete(taskId);
+        if (xhr.status >= 200 && xhr.status < 300) {
+          const etag = xhr.getResponseHeader("ETag") ?? undefined;
+          resolve({ etag: etag || undefined });
+        } else {
+          reject(new Error(`Upload failed: ${xhr.statusText || xhr.status}`));
+        }
+      };
+
+      xhr.onerror = () => {
+        xhrRefs.current.delete(taskId);
+        reject(new Error("网络错误"));
+      };
+
+      xhr.onabort = () => {
+        xhrRefs.current.delete(taskId);
+        reject(new Error("已取消"));
+      };
+
+      xhr.send(body);
+    });
+  };
+
+  // 开始上传单个文件（小文件单 PUT，大文件 multipart 分片）
   const startUpload = useCallback(async (item: UploadItem) => {
-    setUploadQueue(prev => prev.map(i => i.id === item.id ? { ...i, status: "uploading" } : i));
+    setUploadQueue((prev) => prev.map((i) => (i.id === item.id ? { ...i, status: "uploading", error: undefined } : i)));
+
+    const file = item.file;
+    const key = item.key;
+
+    let lastLoaded = 0;
+    let lastTime = Date.now();
+
+    const updateProgress = (loaded: number, total: number) => {
+      const now = Date.now();
+      const diffTime = now - lastTime;
+      const percent = total > 0 ? (loaded / total) * 100 : 0;
+
+      let speedStr = item.speed;
+      if (diffTime >= 500) {
+        const diffLoaded = loaded - lastLoaded;
+        const speedBytes = (diffLoaded / diffTime) * 1000;
+        speedStr = formatSize(speedBytes) + "/s";
+        lastLoaded = loaded;
+        lastTime = now;
+      }
+
+      setUploadQueue((prev) =>
+        prev.map((it) => (it.id === item.id ? { ...it, progress: percent, speed: speedStr } : it)),
+      );
+    };
 
     try {
-      // 1. 获取预签名 URL
-      const signRes = await fetch("/api/upload", {
+      if (file.size < MULTIPART_THRESHOLD) {
+        // single PUT via /api/upload (tokenized)
+        const signRes = await fetchWithAuth("/api/upload", {
+          method: "POST",
+          body: JSON.stringify({ key, contentType: file.type }),
+        });
+        const signData = await signRes.json().catch(() => ({}));
+        if (!signRes.ok || !signData.url) throw new Error(signData.error || "无法获取上传签名");
+
+        await xhrPut(item.id, String(signData.url), file, file.type, (loaded, total) => updateProgress(loaded, total));
+
+        setUploadQueue((prev) => prev.map((i) => (i.id === item.id ? { ...i, status: "success", progress: 100, speed: "" } : i)));
+        fetchFiles();
+        return;
+      }
+
+      // multipart upload via bindings
+      const createRes = await fetchWithAuth("/api/multipart", {
         method: "POST",
-        body: JSON.stringify({ filename: item.key, contentType: item.file.type }),
+        body: JSON.stringify({ action: "create", key, contentType: file.type }),
       });
-      
-      if (!signRes.ok) throw new Error("无法获取上传签名");
-      const { url } = await signRes.json();
+      const createData = await createRes.json().catch(() => ({}));
+      if (!createRes.ok || !createData.uploadId) throw new Error(createData.error || "无法创建分片上传");
 
-      // 2. 使用 XHR 上传以获取进度
-      return new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhrRefs.current.set(item.id, xhr);
+      const uploadId = String(createData.uploadId);
+      const partCount = Math.ceil(file.size / PART_SIZE);
+      const parts: Array<{ etag: string; partNumber: number }> = [];
 
-        let lastLoaded = 0;
-        let lastTime = Date.now();
+      for (let partNumber = 1; partNumber <= partCount; partNumber++) {
+        const start = (partNumber - 1) * PART_SIZE;
+        const end = Math.min(file.size, start + PART_SIZE);
+        const blob = file.slice(start, end);
 
-        xhr.open("PUT", url);
-        xhr.setRequestHeader("Content-Type", item.file.type);
+        const signRes = await fetchWithAuth("/api/multipart", {
+          method: "POST",
+          body: JSON.stringify({ action: "signPart", key, uploadId, partNumber }),
+        });
+        const signData = await signRes.json().catch(() => ({}));
+        if (!signRes.ok || !signData.url) throw new Error(signData.error || "无法获取分片签名");
 
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) {
-            const now = Date.now();
-            const diffTime = now - lastTime;
-            const percent = (e.loaded / e.total) * 100;
-            
-            let speedStr = item.speed;
-            // 每 500ms 更新一次速度
-            if (diffTime >= 500) {
-              const diffLoaded = e.loaded - lastLoaded;
-              const speedBytes = (diffLoaded / diffTime) * 1000;
-              speedStr = formatSize(speedBytes) + "/s";
-              lastLoaded = e.loaded;
-              lastTime = now;
-            }
+        const completed = start;
+        const total = file.size;
 
-            setUploadQueue(prev => prev.map(item => 
-              item.id === item.id ? { ...item, progress: percent, speed: speedStr } : item
-            ));
-          }
-        };
+        const res = await xhrPut(item.id, String(signData.url), blob, file.type, (loaded) => {
+          updateProgress(completed + loaded, total);
+        });
 
-        xhr.onload = () => {
-          xhrRefs.current.delete(item.id);
-          if (xhr.status >= 200 && xhr.status < 300) {
-            setUploadQueue(prev => prev.map(i => 
-              i.id === item.id ? { ...i, status: "success", progress: 100, speed: "" } : i
-            ));
-            fetchFiles(); // 单个文件上传成功后刷新列表
-            resolve();
-          } else {
-            reject(new Error(`Upload failed: ${xhr.statusText}`));
-          }
-        };
+        if (!res.etag) throw new Error("Missing ETag");
+        parts.push({ etag: res.etag, partNumber });
+      }
 
-        xhr.onerror = () => {
-          xhrRefs.current.delete(item.id);
-          reject(new Error("网络错误 (请检查 R2 CORS 配置)"));
-        };
-
-        xhr.onabort = () => {
-          xhrRefs.current.delete(item.id);
-          reject(new Error("已取消"));
-        };
-
-        xhr.send(item.file);
+      const completeRes = await fetchWithAuth("/api/multipart", {
+        method: "POST",
+        body: JSON.stringify({ action: "complete", key, uploadId, parts }),
       });
+      const completeData = await completeRes.json().catch(() => ({}));
+      if (!completeRes.ok) throw new Error(completeData.error || "分片合并失败");
+
+      setUploadQueue((prev) => prev.map((i) => (i.id === item.id ? { ...i, status: "success", progress: 100, speed: "" } : i)));
+      fetchFiles();
     } catch (e: unknown) {
-      console.error(e);
       const message = e instanceof Error ? e.message : String(e);
-      // 如果是手动暂停/取消，状态可能已经被设置了，这里只处理真正的错误
-      setUploadQueue(prev => prev.map(i => 
-        i.id === item.id && i.status !== 'paused' ? { ...i, status: "error", error: message } : i
-      ));
+      setUploadQueue((prev) => prev.map((i) => (i.id === item.id && i.status !== 'paused' ? { ...i, status: "error", error: message, speed: "" } : i)));
     }
-  }, []);
+  }, [fetchFiles, fetchWithAuth, loggedIn, password, username]);
 
   // 上传队列处理器：限制同时上传 1 个文件
   useEffect(() => {
@@ -648,6 +724,71 @@ const Home: React.FC = () => {
       handleFiles(files);
     }
   };
+
+
+  if (!loggedIn) {
+    return (
+      <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 transition-colors">
+        <div className="flex-1 w-full mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 flex items-center justify-center">
+          <div className="w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+            <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+              <h2 className="text-xl font-bold">管理员登录</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">请输入账号与密码后进入管理</p>
+            </div>
+            <div className="p-6 space-y-4">
+              {loginError && (
+                <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm px-4 py-3 rounded-lg">{loginError}</div>
+              )}
+              <div>
+                <label className="block text-sm font-medium mb-2">管理账号</label>
+                <input
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  placeholder="请输入账号"
+                  autoComplete="username"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">管理密码</label>
+                <div className="relative">
+                  <input
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    type={showPassword ? 'text' : 'password'}
+                    className="w-full px-4 py-3 pr-12 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    placeholder="请输入密码"
+                    autoComplete="current-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    title={showPassword ? '隐藏密码' : '显示密码'}
+                  >
+                    {showPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                  </button>
+                </div>
+              </div>
+              <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />
+                记住登录状态
+              </label>
+              <button
+                onClick={() => void handleLogin()}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-white bg-blue-600 hover:bg-blue-700 transition-colors font-medium"
+              >
+                进入管理
+              </button>
+              <div className="text-xs text-gray-500 dark:text-gray-400">
+                提示：需要在 Cloudflare Pages 环境变量设置 `ADMIN_USERNAME` / `ADMIN_PASSWORD`。
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 transition-colors relative">
@@ -762,8 +903,6 @@ const Home: React.FC = () => {
                 const file = node.item;
                 const meta = getFileMeta(file.name, file.type);
                 const isFolder = file.type === "folder";
-                const customUrl = getCustomUrl(file.url);
-
                 return (
                   <div
                     key={`${node.fullPath.join("/")}:${file.type}`}
@@ -815,30 +954,44 @@ const Home: React.FC = () => {
 
                     {/* 操作按钮 */}
                     <div className="flex items-center justify-end gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-	                      {file.type !== "folder" && customUrl && (
+	                      {file.type !== "folder" && (
 	                        <>
                           <button
                             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
-                              copied === customUrl 
+                              copied === file.key 
                                 ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border border-transparent scale-105" 
                                 : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:border-blue-500 dark:hover:text-blue-400 dark:hover:bg-blue-900/20 hover:shadow-sm"
                             }`}
-                            onClick={() => handleCopy(customUrl)}
-                            title="复制直链"
+                            onClick={async () => {
+                            try {
+                              const url = await resolveObjectUrl(file, true);
+                              handleCopy(file.key || file.name, url);
+                            } catch (e) {
+                              const msg = e instanceof Error ? e.message : String(e);
+                              setNotice(`获取分享链接失败: ${msg}`);
+                            }
+                          }}
+                            title="复制链接"
                           >
                             <LinkIcon className="h-4 w-4" />
-                            <span className="hidden sm:inline">复制直链</span>
+                            <span className="hidden sm:inline">复制链接</span>
                           </button>
-	                          <a
-	                            href={getDownloadUrl(file.url, file.name)}
-	                            download={file.name}
-	                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
-	                            onClick={() => setNotice("正在拉起下载... 🚀")}
-	                            title="下载"
-	                          >
+	                          <button
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
+                            onClick={async () => {
+                              try {
+                                const url = await resolveObjectUrl(file, true);
+                                window.location.href = url;
+                              } catch (e) {
+                                const msg = e instanceof Error ? e.message : String(e);
+                                setNotice(`下载失败: ${msg}`);
+                              }
+                            }}
+                            title="下载"
+                          >
                             <DownloadIcon className="h-4 w-4" />
                             <span className="hidden sm:inline">下载</span>
-                          </a>
+                          </button>
                         </>
                       )}
                       {file.type === "folder" && (
@@ -911,24 +1064,38 @@ const Home: React.FC = () => {
                 </p>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
-                {getCustomUrl(preview.url) && (
+                {preview.url && (
                   <>
                     <button
                       className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 border border-transparent hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:border-blue-500 dark:hover:text-blue-400 dark:hover:bg-blue-900/20 transition-all duration-200"
-                      onClick={() => handleCopy(getCustomUrl(preview.url)!)}
+                      onClick={async () => {
+                      try {
+                        const url = await resolveObjectUrl(preview, true);
+                        handleCopy(preview!.key || preview!.name, url);
+                      } catch (e) {
+                        const msg = e instanceof Error ? e.message : String(e);
+                        setNotice(`获取分享链接失败: ${msg}`);
+                      }
+                    }}
                     >
                       <LinkIcon className="h-5 w-5" />
-                      <span className="hidden sm:inline">复制直链</span>
+                      <span className="hidden sm:inline">复制链接</span>
                     </button>
-	                    <a
-	                      href={getDownloadUrl(preview.url, preview.name)}
-	                      download={preview.name}
-	                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
-	                      onClick={() => setNotice("正在拉起下载... 🚀")}
-	                    >
+	                    <button
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
+                      onClick={async () => {
+                        try {
+                          const url = await resolveObjectUrl(preview, true);
+                          window.location.href = url;
+                        } catch (e) {
+                          const msg = e instanceof Error ? e.message : String(e);
+                          setNotice(`下载失败: ${msg}`);
+                        }
+                      }}
+                    >
                       <DownloadIcon className="h-5 w-5" />
                       <span className="hidden sm:inline">下载</span>
-                    </a>
+                    </button>
                   </>
                 )}
                 <button
@@ -946,7 +1113,7 @@ const Home: React.FC = () => {
             <div className="flex-1 overflow-auto bg-gray-100 dark:bg-black flex items-center justify-center p-4">
               {(preview.type.startsWith("image/") || /\.(jpg|jpeg|png|gif|webp|svg|bmp|ico|tiff)$/i.test(preview.name.toLowerCase())) && (
                 <img
-                  src={getCustomUrl(preview.url) || ""}
+                  src={preview.url || ""}
                   alt={preview.name}
                   className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
                 />
@@ -957,7 +1124,7 @@ const Home: React.FC = () => {
 	                  style={{ maxHeight: '100%' }}
 	                >
 	                  <video
-	                    src={getCustomUrl(preview.url) || ""}
+	                    src={preview.url || ""}
 	                    controls
 	                    className="w-full h-full object-contain"
 	                  />
@@ -971,7 +1138,7 @@ const Home: React.FC = () => {
                     </div>
                     <h3 className="text-lg font-medium text-gray-900 dark:text-white text-center break-all">{preview.name}</h3>
                     <audio
-                      src={getCustomUrl(preview.url) || ""}
+                      src={preview.url || ""}
                       controls
                       className="w-full"
                     />
@@ -980,7 +1147,7 @@ const Home: React.FC = () => {
               )}
               {preview.type === "application/pdf" && (
                 <iframe
-                  src={getCustomUrl(preview.url) || ""}
+                  src={preview.url || ""}
                   className="w-full h-full bg-white rounded-lg shadow-lg"
                   title="PDF Preview"
                 />
@@ -988,7 +1155,7 @@ const Home: React.FC = () => {
               {(preview.type.includes("word") || preview.type.includes("document") || preview.type.includes("sheet") || preview.type.includes("excel") || preview.type.includes("presentation") || preview.type.includes("powerpoint")) && (
                 <iframe
                   src={`https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(
-                    getCustomUrl(preview.url) || ""
+                    preview.url || ""
                   )}`}
                   className="w-full h-full bg-white"
                   title="Office Preview"
@@ -1010,15 +1177,21 @@ const Home: React.FC = () => {
                     </div>
                     <h3 className="text-xl font-medium text-gray-900 dark:text-white mb-2">无法预览此文件</h3>
                     <p className="text-gray-500 dark:text-gray-400 mb-6">此文件类型暂不支持在线预览，请下载后查看。</p>
-	                    <a
-	                      href={getDownloadUrl(preview.url, preview.name)}
-	                      download={preview.name}
-	                      className="inline-flex items-center gap-2 px-6 py-3 rounded-lg text-base font-medium text-white bg-blue-600 hover:bg-blue-700 transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
-	                      onClick={() => setNotice("正在拉起下载... 🚀")}
-	                    >
+	                    <button
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
+                      onClick={async () => {
+                        try {
+                          const url = await resolveObjectUrl(preview, true);
+                          window.location.href = url;
+                        } catch (e) {
+                          const msg = e instanceof Error ? e.message : String(e);
+                          setNotice(`下载失败: ${msg}`);
+                        }
+                      }}
+                    >
                       <DownloadIcon className="h-5 w-5" />
-                      下载文件
-                    </a>
+                      <span className="hidden sm:inline">下载</span>
+                    </button>
                   </div>
                 )}
             </div>
