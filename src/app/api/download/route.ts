@@ -5,44 +5,10 @@ import { getPublicR2BaseUrl, issueAccessToken } from "@/lib/cf";
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
-const sanitizeHeaderValue = (value: string) => value.replaceAll("\n", " ").replaceAll("\r", " ").trim();
-
-const encodeRFC5987ValueChars = (value: string) =>
-  encodeURIComponent(value)
-    .replace(/['()]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)
-    .replace(/\*/g, "%2A");
-
-const toAsciiFallbackFilename = (value: string) => {
-  const cleaned = sanitizeHeaderValue(value).replace(/[/\\"]/g, "_");
-  const ascii = cleaned.replace(/[^\x20-\x7E]/g, "_");
-  return ascii.slice(0, 180) || "download";
-};
-
-const buildContentDisposition = (disposition: "attachment" | "inline", filename: string) => {
-  const safeFallback = toAsciiFallbackFilename(filename);
-  const encoded = encodeRFC5987ValueChars(sanitizeHeaderValue(filename));
-  return `${disposition}; filename="${safeFallback}"; filename*=UTF-8''${encoded}`;
-};
-
-const encodeKeyForUrlPath = (key: string) =>
-  key
-    .split("/")
-    .map((seg) => encodeURIComponent(seg))
-    .join("/");
-
-const buildPublicR2ObjectUrl = (baseUrl: string, key: string, filename: string | null, download: boolean) => {
-  // baseUrl is normalized without query/hash and without trailing slash
-  const path = encodeKeyForUrlPath(key);
-  const u = new URL(`${baseUrl}/${path}`);
-
-  // Attempt to force download + filename via S3-compatible response override.
-  if (download) {
-    const suggested = filename || key.split("/").pop() || "download";
-    u.searchParams.set("response-content-disposition", buildContentDisposition("attachment", suggested));
-    u.searchParams.set("response-content-type", "application/octet-stream");
-  }
-
-  return u.toString();
+const buildDirectRedirectUrl = (origin: string, key: string) => {
+  const params = new URLSearchParams();
+  params.set("key", key);
+  return `${origin}/api/direct?${params.toString()}`;
 };
 
 export async function GET(req: NextRequest) {
@@ -57,7 +23,9 @@ export async function GET(req: NextRequest) {
 
     const publicBaseUrl = getPublicR2BaseUrl();
     if (direct && download && publicBaseUrl) {
-      const url = buildPublicR2ObjectUrl(publicBaseUrl, key, filename || null, true);
+      // Return a same-origin redirector so the browser can use <a download> reliably,
+      // while the bytes still come directly from R2.
+      const url = buildDirectRedirectUrl(new URL(req.url).origin, key);
       return NextResponse.json({ url }, { headers: { "Cache-Control": "no-store" } });
     }
 
