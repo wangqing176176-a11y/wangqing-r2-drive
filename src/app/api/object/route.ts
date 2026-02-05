@@ -4,9 +4,22 @@ import { hasTokenSecret, verifyAccessToken, getBucket } from "@/lib/cf";
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
-const safeFilename = (name: string) => {
-  const cleaned = name.replaceAll("\n", " ").replaceAll("\r", " ").replaceAll('"', "'");
+const sanitizeHeaderValue = (value: string) => value.replaceAll("\n", " ").replaceAll("\r", " ").trim();
+
+const encodeRFC5987ValueChars = (value: string) =>
+  encodeURIComponent(value)
+    .replace(/['()]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)
+    .replace(/\*/g, "%2A");
+
+const toAsciiFallbackFilename = (value: string) => {
+  const cleaned = sanitizeHeaderValue(value).replace(/[/\\"]/g, "_");
   return cleaned.slice(0, 180) || "download";
+};
+
+const buildContentDisposition = (disposition: "attachment" | "inline", filename: string) => {
+  const safeFallback = toAsciiFallbackFilename(filename);
+  const encoded = encodeRFC5987ValueChars(sanitizeHeaderValue(filename));
+  return `${disposition}; filename="${safeFallback}"; filename*=UTF-8''${encoded}`;
 };
 
 const json = (status: number, obj: unknown) =>
@@ -51,15 +64,15 @@ export async function GET(req: NextRequest) {
 
     if (!key) return json(400, { error: "Missing key" });
 
-    const suggestedName = safeFilename(filename || key.split("/").pop() || "download");
+    const suggestedName = sanitizeHeaderValue(filename || key.split("/").pop() || "download");
 
     const payload = `object\n${key}\n${download ? "1" : "0"}`;
-if (hasTokenSecret()) {
-  const token = searchParams.get("token") ?? "";
-  if (!token || !(await verifyAccessToken(payload, token))) {
-    return json(401, { error: "Unauthorized" });
-  }
-}
+    if (hasTokenSecret()) {
+      const token = searchParams.get("token") ?? "";
+      if (!token || !(await verifyAccessToken(payload, token))) {
+        return json(401, { error: "Unauthorized" });
+      }
+    }
 
     const bucket = getBucket();
 
@@ -69,14 +82,26 @@ if (hasTokenSecret()) {
     if (rangeHeader || download) head = await bucket.head(key);
 
     const totalSize: number | null = head?.size ?? null;
-    const range = parseRange(rangeHeader, totalSize);
+    let range = parseRange(rangeHeader, totalSize);
 
     const headers = new Headers();
     headers.set("Cache-Control", "no-store");
     headers.set("Accept-Ranges", "bytes");
 
     if (download) {
-      headers.set("Content-Disposition", `attachment; filename="${suggestedName}"`);
+      headers.set("Content-Disposition", buildContentDisposition("attachment", suggestedName));
+    }
+
+    if (rangeHeader && !range) {
+      // Invalid or unsatisfiable range. Prefer a spec-compliant 416 over silently ignoring it.
+      if (typeof totalSize === "number") headers.set("Content-Range", `bytes */${totalSize}`);
+      return new Response("Range Not Satisfiable", { status: 416, headers });
+    }
+
+    // Cloudflare may strip Content-Length on streamed 200 responses. For downloads, force a full-range 206
+    // so Chrome can show total size and detect truncation.
+    if (!range && download && typeof totalSize === "number" && totalSize > 0) {
+      range = { start: 0, end: totalSize - 1 };
     }
 
     if (range) {
@@ -88,10 +113,10 @@ if (hasTokenSecret()) {
       if (contentType) headers.set("Content-Type", contentType);
 
       if (!download && (filename || contentType === "application/pdf")) {
-        headers.set("Content-Disposition", `inline; filename="${suggestedName}"`);
+        headers.set("Content-Disposition", buildContentDisposition("inline", suggestedName));
       }
 
-      if (totalSize != null) headers.set("Content-Range", `bytes ${range.start}-${range.end}/${totalSize}`);
+      if (typeof totalSize === "number") headers.set("Content-Range", `bytes ${range.start}-${range.end}/${totalSize}`);
       headers.set("Content-Length", String(length));
 
       const etag = obj.httpEtag ?? obj.etag;
@@ -107,7 +132,7 @@ if (hasTokenSecret()) {
     if (contentType) headers.set("Content-Type", contentType);
 
     if (!download && (filename || contentType === "application/pdf")) {
-      headers.set("Content-Disposition", `inline; filename="${suggestedName}"`);
+      headers.set("Content-Disposition", buildContentDisposition("inline", suggestedName));
     }
 
     const size = obj.size ?? head?.size;
