@@ -15,6 +15,7 @@ const triggerBrowserDownload = (url: string, filename?: string) => {
   const a = document.createElement("a");
   a.href = url;
   if (filename) a.download = filename;
+  a.target = "_self";
   a.rel = "noopener noreferrer";
   a.style.display = "none";
   document.body.appendChild(a);

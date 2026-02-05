@@ -5,9 +5,11 @@ import { getPublicR2BaseUrl, issueAccessToken } from "@/lib/cf";
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
-const buildDirectRedirectUrl = (origin: string, key: string) => {
+const buildDirectRedirectUrl = (origin: string, key: string, filename?: string) => {
   const params = new URLSearchParams();
   params.set("key", key);
+  params.set("download", "1");
+  if (filename) params.set("filename", filename);
   return `${origin}/api/direct?${params.toString()}`;
 };
 
@@ -25,7 +27,7 @@ export async function GET(req: NextRequest) {
     if (direct && download && publicBaseUrl) {
       // Return a same-origin redirector so the browser can use <a download> reliably,
       // while the bytes still come directly from R2.
-      const url = buildDirectRedirectUrl(new URL(req.url).origin, key);
+      const url = buildDirectRedirectUrl(new URL(req.url).origin, key, filename || undefined);
       return NextResponse.json({ url }, { headers: { "Cache-Control": "no-store" } });
     }
 
