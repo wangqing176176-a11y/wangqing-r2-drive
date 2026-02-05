@@ -30,43 +30,6 @@ const encodeKeyForUrlPath = (key: string) =>
     .map((seg) => encodeURIComponent(seg))
     .join("/");
 
-const buildUpstreamUrl = (baseUrl: string, key: string) => new URL(`${baseUrl}/${encodeKeyForUrlPath(key)}`);
-
-const buildProxyHeaders = (upstream: Response, download: boolean, suggestedFilename: string) => {
-  const headers = new Headers();
-  headers.set("Cache-Control", "no-store, no-transform");
-  headers.set("Accept-Ranges", "bytes");
-
-  const contentRange = upstream.headers.get("content-range");
-  if (contentRange) headers.set("Content-Range", contentRange);
-
-  const contentLength = upstream.headers.get("content-length");
-  if (contentLength) headers.set("Content-Length", contentLength);
-
-  const etag = upstream.headers.get("etag");
-  if (etag) headers.set("ETag", etag);
-
-  const lastModified = upstream.headers.get("last-modified");
-  if (lastModified) headers.set("Last-Modified", lastModified);
-
-  const contentType = upstream.headers.get("content-type");
-  if (contentType) headers.set("Content-Type", contentType);
-
-  if (download) {
-    headers.set("Content-Disposition", buildContentDisposition("attachment", suggestedFilename));
-    headers.set("Content-Type", "application/octet-stream");
-  }
-
-  return headers;
-};
-
-const fetchUpstream = async (req: NextRequest, method: "GET" | "HEAD", url: URL) => {
-  const headers = new Headers();
-  const range = req.headers.get("range");
-  if (range) headers.set("Range", range);
-  return fetch(url, { method, headers });
-};
-
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const key = (searchParams.get("key") ?? searchParams.get("path") ?? "").trim();
@@ -78,25 +41,19 @@ export async function GET(req: NextRequest) {
   if (!baseUrl) return NextResponse.json({ error: "PUBLIC_R2_BASE_URL not configured" }, { status: 400 });
 
   const suggested = filename || key.split("/").pop() || "download";
-  const upstreamUrl = buildUpstreamUrl(baseUrl, key);
-  const upstream = await fetchUpstream(req, "GET", upstreamUrl);
-  const headers = buildProxyHeaders(upstream, download, suggested);
-  return new Response(upstream.body, { status: upstream.status, headers });
-}
 
-export async function HEAD(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const key = (searchParams.get("key") ?? searchParams.get("path") ?? "").trim();
-  const download = searchParams.get("download") === "1";
-  const filename = sanitizeHeaderValue(searchParams.get("filename") ?? "");
-  if (!key) return new Response(null, { status: 400 });
+  const targetUrl = new URL(`${baseUrl}/${encodeKeyForUrlPath(key)}`);
+  if (download) {
+    // S3-compatible response header overrides (works on r2.dev and most custom domains).
+    targetUrl.searchParams.set("response-content-disposition", buildContentDisposition("attachment", suggested));
+    targetUrl.searchParams.set("response-content-type", "application/octet-stream");
+  }
 
-  const baseUrl = getPublicR2BaseUrl();
-  if (!baseUrl) return new Response(null, { status: 400 });
-
-  const suggested = filename || key.split("/").pop() || "download";
-  const upstreamUrl = buildUpstreamUrl(baseUrl, key);
-  const upstream = await fetchUpstream(req, "HEAD", upstreamUrl);
-  const headers = buildProxyHeaders(upstream, download, suggested);
-  return new Response(null, { status: upstream.status, headers });
+  const target = targetUrl.toString();
+  return NextResponse.redirect(target, {
+    status: 302,
+    headers: {
+      "Cache-Control": "no-store",
+    },
+  });
 }

@@ -11,11 +11,10 @@ type FileItem = {
   children?: FileItem[];
 };
 
-const triggerBrowserDownload = (url: string, filename?: string) => {
+const triggerBrowserDownload = (url: string) => {
   const a = document.createElement("a");
   a.href = url;
-  if (filename) a.download = filename;
-  a.target = "_self";
+  a.target = "_blank";
   a.rel = "noopener noreferrer";
   a.style.display = "none";
   document.body.appendChild(a);
@@ -906,7 +905,7 @@ const Home: React.FC = () => {
                             }`}
                             onClick={async () => {
                             try {
-                              const url = await resolveObjectUrl(file, true);
+                              const url = await resolveObjectUrl(file, true, { direct: true });
                               handleCopy(file.key || file.name, url);
                             } catch (e) {
                               const msg = e instanceof Error ? e.message : String(e);
@@ -923,7 +922,7 @@ const Home: React.FC = () => {
                             onClick={async () => {
                               try {
                                 const url = await resolveObjectUrl(file, true, { direct: true });
-                                triggerBrowserDownload(url, file.name);
+                                triggerBrowserDownload(url);
                               } catch (e) {
                                 const msg = e instanceof Error ? e.message : String(e);
                                 setNotice(`下载失败: ${msg}`);
@@ -1012,7 +1011,7 @@ const Home: React.FC = () => {
                       className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 border border-transparent hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:border-blue-500 dark:hover:text-blue-400 dark:hover:bg-blue-900/20 transition-all duration-200"
                       onClick={async () => {
                       try {
-                        const url = await resolveObjectUrl(preview, true);
+                        const url = await resolveObjectUrl(preview, true, { direct: true });
                         handleCopy(preview!.key || preview!.name, url);
                       } catch (e) {
                         const msg = e instanceof Error ? e.message : String(e);
@@ -1028,7 +1027,7 @@ const Home: React.FC = () => {
 	                      onClick={async () => {
 	                        try {
 	                        const url = await resolveObjectUrl(preview, true, { direct: true });
-	                        triggerBrowserDownload(url, preview.name);
+	                        triggerBrowserDownload(url);
 	                      } catch (e) {
 	                        const msg = e instanceof Error ? e.message : String(e);
 	                        setNotice(`下载失败: ${msg}`);
@@ -1124,7 +1123,7 @@ const Home: React.FC = () => {
 	                      onClick={async () => {
 	                        try {
 	                          const url = await resolveObjectUrl(preview, true, { direct: true });
-	                          triggerBrowserDownload(url, preview.name);
+	                          triggerBrowserDownload(url);
 	                        } catch (e) {
 	                          const msg = e instanceof Error ? e.message : String(e);
 	                          setNotice(`下载失败: ${msg}`);
