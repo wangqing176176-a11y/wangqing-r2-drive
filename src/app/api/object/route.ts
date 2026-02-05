@@ -4,6 +4,8 @@ import { hasTokenSecret, verifyAccessToken, getBucket } from "@/lib/cf";
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
+const DOWNLOAD_BUFFER_MAX_BYTES = 32 * 1024 * 1024; // 32MiB
+
 const sanitizeHeaderValue = (value: string) => value.replaceAll("\n", " ").replaceAll("\r", " ").trim();
 
 const encodeRFC5987ValueChars = (value: string) =>
@@ -82,7 +84,7 @@ export async function GET(req: NextRequest) {
     if (rangeHeader || download) head = await bucket.head(key);
 
     const totalSize: number | null = head?.size ?? null;
-    let range = parseRange(rangeHeader, totalSize);
+    const range = parseRange(rangeHeader, totalSize);
 
     const headers = new Headers();
     headers.set("Cache-Control", "no-store");
@@ -96,12 +98,6 @@ export async function GET(req: NextRequest) {
       // Invalid or unsatisfiable range. Prefer a spec-compliant 416 over silently ignoring it.
       if (typeof totalSize === "number") headers.set("Content-Range", `bytes */${totalSize}`);
       return new Response("Range Not Satisfiable", { status: 416, headers });
-    }
-
-    // Cloudflare may strip Content-Length on streamed 200 responses. For downloads, force a full-range 206
-    // so Chrome can show total size and detect truncation.
-    if (!range && download && typeof totalSize === "number" && totalSize > 0) {
-      range = { start: 0, end: totalSize - 1 };
     }
 
     if (range) {
@@ -140,6 +136,19 @@ export async function GET(req: NextRequest) {
 
     const etag = obj.httpEtag ?? obj.etag ?? head?.etag;
     if (etag) headers.set("ETag", etag);
+
+    // Cloudflare may strip Content-Length for streamed 200 responses. For small downloads, buffer to ensure
+    // a fixed-length 200 so Chrome can show total size and avoid silently saving truncated files.
+    if (download && !rangeHeader && typeof size === "number" && size > 0 && size <= DOWNLOAD_BUFFER_MAX_BYTES) {
+      const body = obj.body;
+      if (!body) return new Response("Not found", { status: 404 });
+      const buf = await new Response(body).arrayBuffer();
+      if (typeof size === "number" && buf.byteLength !== size) {
+        return new Response("Upstream truncated", { status: 502, headers });
+      }
+      headers.set("Content-Length", String(buf.byteLength));
+      return new Response(buf, { status: 200, headers });
+    }
 
     return new Response(obj.body, { status: 200, headers });
   } catch (error: unknown) {
