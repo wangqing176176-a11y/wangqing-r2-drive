@@ -1065,7 +1065,7 @@ const Home: React.FC = () => {
 	              {(preview.type.startsWith("video/") || /\.(mp4|webm|ogg|mov|mkv|avi|m4v)$/i.test(preview.name.toLowerCase())) && (
 	                <div className="flex flex-col items-center w-full h-full gap-2">
 	                  <div className="shrink-0 text-sm text-gray-500 dark:text-gray-400 text-center px-4">
-	                    若视频加载失败或播放卡顿，可能是由于网络波动或文件过大，建议刷新页面重试或下载后观看。
+	                    如遇视频加载失败，可尝试刷新重试！
 	                  </div>
 	                  <div className="flex-1 w-full min-h-0 flex items-center justify-center">
 	                    <div 
