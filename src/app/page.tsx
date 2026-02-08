@@ -1061,14 +1061,11 @@ const Home: React.FC = () => {
                 />
               )}
 	              {(preview.type.startsWith("video/") || /\.(mp4|webm|ogg|mov|mkv|avi|m4v)$/i.test(preview.name.toLowerCase())) && (
-	                <div className="flex flex-col items-center w-full gap-4">
-	                  <div className="text-sm text-gray-500 dark:text-gray-400 bg-white/50 dark:bg-gray-800/50 px-4 py-2 rounded-lg backdrop-blur-sm border border-gray-200 dark:border-gray-700 shadow-sm text-center max-w-2xl">
+	                <div className="flex flex-col items-center w-full h-full gap-2">
+	                  <div className="shrink-0 text-sm text-gray-500 dark:text-gray-400 text-center px-4">
 	                    若视频加载失败或播放卡顿，可能是由于网络波动或文件过大，建议刷新页面重试或下载后观看。
 	                  </div>
-	                  <div 
-	                    className="relative w-full max-w-5xl aspect-video bg-black rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.3)] overflow-hidden mx-auto"
-	                    style={{ maxHeight: '100%' }}
-	                  >
+	                  <div className="relative w-full max-w-6xl flex-1 min-h-0 bg-black rounded-lg shadow-lg overflow-hidden">
 	                    <video
 	                      src={preview.url || ""}
 	                      controls
